@@ -1,5 +1,9 @@
-import { app, BrowserWindow, session } from 'electron'
+import { app, BrowserWindow, ipcMain, session } from 'electron'
 import { join } from 'path'
+import { initDatabase, closeDatabase } from './db/database'
+import { addTransaction, updateTransaction, deleteTransaction, getTransactions, getPositions } from './db/positions'
+import { getCachedPrices, getLatestCachedDate, upsertPrices, upsertTickerMetadata } from './db/priceCache'
+import type { NewTransaction, TransactionFilters } from '../src/types/index'
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -26,7 +30,63 @@ function createWindow(): BrowserWindow {
   return win
 }
 
+function registerIpcHandlers(): void {
+  ipcMain.handle('db:addTransaction', (_event, tx: NewTransaction) => {
+    return addTransaction(tx)
+  })
+
+  ipcMain.handle('db:updateTransaction', (_event, id: string, updates: Partial<NewTransaction>) => {
+    return updateTransaction(id, updates)
+  })
+
+  ipcMain.handle('db:deleteTransaction', (_event, id: string) => {
+    deleteTransaction(id)
+  })
+
+  ipcMain.handle('db:getTransactions', (_event, filters?: TransactionFilters) => {
+    return getTransactions(filters)
+  })
+
+  ipcMain.handle('db:getPositions', () => {
+    return getPositions()
+  })
+
+  ipcMain.handle('db:getPortfolioSummary', () => {
+    // Stub — full implementation in Task 5 (Zustand store) with market data
+    return {
+      totalValue: 0,
+      totalCost: 0,
+      totalDayChange: 0,
+      totalDayChangePercent: 0,
+      totalUnrealizedGain: 0,
+      totalUnrealizedGainPercent: 0,
+      totalRealizedGain: 0,
+      positionCount: 0
+    }
+  })
+
+  // Market data stubs — will be implemented in Task 4 (Yahoo Finance integration)
+  ipcMain.handle('market:getQuote', (_event, _ticker: string) => {
+    return null
+  })
+
+  ipcMain.handle('market:getQuotes', (_event, _tickers: string[]) => {
+    return []
+  })
+
+  ipcMain.handle('market:getHistoricalPrices', (_event, ticker: string, from: string, to: string) => {
+    return getCachedPrices(ticker, from, to)
+  })
+
+  ipcMain.handle('market:searchTicker', (_event, _query: string) => {
+    return []
+  })
+}
+
 app.whenReady().then(() => {
+  initDatabase()
+  registerIpcHandlers()
+
   session.defaultSession.webRequest.onHeadersReceived((_details, callback) => {
     callback({
       responseHeaders: {
@@ -51,4 +111,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  closeDatabase()
 })
