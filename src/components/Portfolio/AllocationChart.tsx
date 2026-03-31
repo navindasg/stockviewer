@@ -119,19 +119,20 @@ export function AllocationChart({ positions, quotes }: AllocationChartProps) {
       <h3 className="text-sm font-semibold text-sv-text mb-3">
         Portfolio Allocation
       </h3>
-      <ResponsiveContainer width="100%" height={240}>
-        <PieChart>
+      <ResponsiveContainer width="100%" height={280}>
+        <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
           <Pie
             data={slices as SliceData[]}
             dataKey="value"
             nameKey="ticker"
             cx="50%"
             cy="50%"
-            innerRadius={60}
-            outerRadius={95}
+            innerRadius={55}
+            outerRadius={85}
             paddingAngle={1}
             label={renderLabel}
             labelLine={false}
+            isAnimationActive={false}
           >
             {slices.map((s) => (
               <Cell key={s.ticker} fill={s.color} stroke="none" />

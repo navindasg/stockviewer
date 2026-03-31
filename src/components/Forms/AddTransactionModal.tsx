@@ -96,7 +96,6 @@ export function AddTransactionModal({ isOpen, onClose, prefillTicker }: AddTrans
         ticker: quote.ticker,
         companyName: quote.companyName,
         currentPrice: quote.price,
-        price: String(quote.price),
         tickerValidated: true
       }))
     } catch {

@@ -1,4 +1,10 @@
-import YahooFinance from 'yahoo-finance2'
+import YahooFinanceModule from 'yahoo-finance2'
+
+// electron-vite compiles ESM default import to CJS require(), which wraps
+// the class in { default: YahooFinance }. Handle both cases.
+const YahooFinance = ('default' in YahooFinanceModule
+  ? (YahooFinanceModule as Record<string, unknown>).default
+  : YahooFinanceModule) as new () => typeof YahooFinanceModule
 import { format } from 'date-fns'
 import {
   getCachedPrices,

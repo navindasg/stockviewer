@@ -12,6 +12,68 @@ import {
 } from '../../utils/formatters'
 import type { Transaction, Quote, Position } from '../../types/index'
 
+interface PositionPickerProps {
+  readonly positions: ReadonlyArray<Position>
+  readonly setSelectedTicker: (ticker: string) => void
+}
+
+function PositionPicker({ positions, setSelectedTicker }: PositionPickerProps) {
+  const quotes = useAppStore((state) => state.quotes)
+  const openPositions = positions.filter((p) => p.status === 'OPEN')
+
+  if (openPositions.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-sv-text-muted text-sm">
+        No open positions. Add a transaction to get started.
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4">
+      <h2 className="text-lg font-semibold text-sv-text mb-4">Select a Position</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {openPositions.map((p) => {
+          const quote = quotes[p.ticker]
+          const price = quote?.price ?? 0
+          const gainPct = p.costBasis > 0 ? ((price - p.costBasis) / p.costBasis) * 100 : 0
+          const isPositive = gainPct >= 0
+
+          return (
+            <button
+              key={p.ticker}
+              type="button"
+              onClick={() => setSelectedTicker(p.ticker)}
+              className="flex items-center gap-3 p-3 rounded-lg bg-sv-surface border border-sv-border hover:bg-sv-elevated transition-colors cursor-pointer text-left"
+            >
+              <span
+                className="w-3 h-3 rounded-full flex-shrink-0"
+                style={{ backgroundColor: p.color }}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-semibold text-sv-text text-sm">{p.ticker}</span>
+                  <span className="text-xs text-sv-text-muted truncate">{p.companyName}</span>
+                </div>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  {quote && (
+                    <span className="font-mono tabular-nums text-xs text-sv-text">
+                      {formatCurrency(price)}
+                    </span>
+                  )}
+                  <span className={`font-mono tabular-nums text-xs ${isPositive ? 'text-sv-positive' : 'text-sv-negative'}`}>
+                    {isPositive ? '+' : ''}{formatPercent(gainPct)}
+                  </span>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function BackIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -55,11 +117,7 @@ export function PositionDetail() {
   const [txLoading, setTxLoading] = useState(false)
 
   if (selectedTicker === null) {
-    return (
-      <div className="flex items-center justify-center h-full text-sv-text-muted">
-        Select a position from the dashboard to view details.
-      </div>
-    )
+    return <PositionPicker positions={positions} setSelectedTicker={setSelectedTicker} />
   }
 
   const position = positions.find((p) => p.ticker === selectedTicker) ?? null

@@ -107,7 +107,9 @@ app.whenReady().then(() => {
       responseHeaders: {
         ...(_details.responseHeaders ?? {}),
         'Content-Security-Policy': [
-          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self'"
+          process.env.ELECTRON_RENDERER_URL
+            ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ws://localhost:* http://localhost:*; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com"
+            : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com"
         ]
       }
     })

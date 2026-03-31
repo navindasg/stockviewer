@@ -103,7 +103,9 @@ export function EditTransactionModal({ isOpen, onClose, transaction }: EditTrans
       setIsSubmitting(false)
       fetchQuote()
     }
-  }, [isOpen, transaction, fetchQuote])
+    // Only reset form when modal opens, not when transaction reference changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
