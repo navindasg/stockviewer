@@ -108,9 +108,7 @@ export function PositionList({ positions, quotes }: PositionListProps) {
   const [sort, setSort] = useState<SortState>({ field: 'marketValue', direction: 'desc' })
 
   const enriched = useMemo(
-    () => positions
-      .filter((p) => p.status === 'OPEN')
-      .map((p) => enrichPosition(p, quotes)),
+    () => positions.map((p) => enrichPosition(p, quotes)),
     [positions, quotes]
   )
 
@@ -135,7 +133,7 @@ export function PositionList({ positions, quotes }: PositionListProps) {
   if (sorted.length === 0) {
     return (
       <div className="rounded-lg bg-sv-surface border border-sv-border p-8 text-center text-sv-text-muted text-sm">
-        No open positions to display
+        No positions match the current filters
       </div>
     )
   }

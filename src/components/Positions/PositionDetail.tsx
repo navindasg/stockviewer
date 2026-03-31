@@ -257,6 +257,10 @@ interface MarketStatusBadgeProps {
   readonly quote: Quote | null
 }
 
+function isQuoteError(quote: Quote): boolean {
+  return quote.price === 0 && quote.previousClose === 0 && quote.dayChange === 0
+}
+
 function MarketStatusBadge({ quote }: MarketStatusBadgeProps) {
   if (quote === null) {
     return <span className="text-sv-text-muted text-xs">No data</span>
@@ -264,6 +268,16 @@ function MarketStatusBadge({ quote }: MarketStatusBadgeProps) {
 
   const isStale = quote.isStale ?? false
   const isOffline = quote.offline ?? false
+  const hasError = isQuoteError(quote)
+
+  if (hasError) {
+    return (
+      <span className="flex items-center gap-1 text-sv-negative text-xs" title="Unable to retrieve market data. The ticker may be delisted or invalid.">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-sv-negative" />
+        Unavailable
+      </span>
+    )
+  }
 
   if (isOffline) {
     return (

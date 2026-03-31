@@ -36,6 +36,39 @@ export function Shell() {
     setModalOpen(false)
   }, [setModalOpen])
 
+  const handleRefresh = useCallback(async () => {
+    try {
+      await fetchPositions()
+      const tickers = positions.map((p) => p.ticker)
+      if (tickers.length > 0) {
+        await fetchQuotes(tickers)
+      }
+    } catch {
+      // Error is thrown by store actions; UI will reflect stale state
+    }
+  }, [fetchPositions, fetchQuotes, positions])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isModifier = event.ctrlKey || event.metaKey
+
+      if (isModifier && event.key === 'n') {
+        event.preventDefault()
+        setModalOpen(true)
+        return
+      }
+
+      if (isModifier && event.key === 'r') {
+        event.preventDefault()
+        handleRefresh()
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [setModalOpen, handleRefresh])
+
   useEffect(() => {
     const loadInitialData = async () => {
       try {

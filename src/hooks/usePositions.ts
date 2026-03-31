@@ -37,13 +37,13 @@ function matchesGainStatus(
 
 function matchesSector(
   position: Position,
-  sector: string | null,
+  sectors: ReadonlyArray<string>,
   quotes: Readonly<Record<string, Quote>>
 ): boolean {
-  if (sector === null) return true
+  if (sectors.length === 0) return true
 
   const quote = quotes[position.ticker]
-  return quote?.sector === sector
+  return quote?.sector != null && sectors.includes(quote.sector)
 }
 
 function applyFilters(
@@ -56,7 +56,7 @@ function applyFilters(
       matchesSearchText(pos, filters.searchText) &&
       matchesPositionStatus(pos, filters.positionStatus) &&
       matchesGainStatus(pos, filters.gainStatus, quotes) &&
-      matchesSector(pos, filters.sector, quotes)
+      matchesSector(pos, filters.sectors, quotes)
   )
 }
 

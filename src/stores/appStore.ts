@@ -6,7 +6,7 @@ export type GainStatus = 'all' | 'winners' | 'losers'
 export type PositionStatusFilter = 'all' | 'open' | 'closed'
 
 export interface FilterState {
-  readonly sector: string | null
+  readonly sectors: ReadonlyArray<string>
   readonly dateFrom: string | null
   readonly dateTo: string | null
   readonly gainStatus: GainStatus
@@ -15,7 +15,7 @@ export interface FilterState {
 }
 
 const DEFAULT_FILTERS: FilterState = {
-  sector: null,
+  sectors: [],
   dateFrom: null,
   dateTo: null,
   gainStatus: 'all',

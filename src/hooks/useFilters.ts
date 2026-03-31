@@ -5,18 +5,21 @@ export function useFilters() {
   const setFilter = useAppStore((state) => state.setFilter)
   const clearFilters = useAppStore((state) => state.clearFilters)
 
-  const hasActiveFilters =
-    filters.searchText !== '' ||
-    filters.positionStatus !== 'all' ||
-    filters.gainStatus !== 'all' ||
-    filters.sector !== null ||
-    filters.dateFrom !== null ||
-    filters.dateTo !== null
+  const activeFilterCount = [
+    filters.searchText !== '',
+    filters.positionStatus !== 'all',
+    filters.gainStatus !== 'all',
+    filters.sectors.length > 0,
+    filters.dateFrom !== null || filters.dateTo !== null
+  ].filter(Boolean).length
+
+  const hasActiveFilters = activeFilterCount > 0
 
   return {
     filters,
     setFilter,
     clearFilters,
-    hasActiveFilters
+    hasActiveFilters,
+    activeFilterCount
   } as const
 }

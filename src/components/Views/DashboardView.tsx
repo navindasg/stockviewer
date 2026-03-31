@@ -4,6 +4,7 @@ import { PortfolioSummary } from '../Portfolio/PortfolioSummary'
 import { AllocationChart } from '../Portfolio/AllocationChart'
 import { PerformanceBar } from '../Portfolio/PerformanceBar'
 import { PositionList } from '../Positions/PositionList'
+import { FilterBar } from '../Filters/FilterBar'
 
 function EmptyState() {
   const setModalOpen = useAppStore((s) => s.setModalOpen)
@@ -31,7 +32,7 @@ function EmptyState() {
 }
 
 export function DashboardView() {
-  const { positions, isLoading } = usePositions()
+  const { positions, filteredPositions, isLoading } = usePositions()
   const quotes = useAppStore((s) => s.quotes)
 
   const hasPositions = positions.length > 0
@@ -42,18 +43,20 @@ export function DashboardView() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <PortfolioSummary />
+      <FilterBar />
+
+      <PortfolioSummary filteredPositions={filteredPositions} quotes={quotes} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <AllocationChart positions={positions} quotes={quotes} />
+          <AllocationChart positions={filteredPositions} quotes={quotes} />
         </div>
         <div>
-          <PerformanceBar positions={positions} quotes={quotes} />
+          <PerformanceBar positions={filteredPositions} quotes={quotes} />
         </div>
       </div>
 
-      <PositionList positions={positions} quotes={quotes} />
+      <PositionList positions={filteredPositions} quotes={quotes} />
     </div>
   )
 }

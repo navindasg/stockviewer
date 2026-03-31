@@ -1,4 +1,7 @@
+import { useMemo } from 'react'
 import { usePortfolioStats } from '../../hooks/usePortfolioStats'
+import { computePortfolioSummary } from '../../utils/calculations'
+import type { Position, Quote } from '../../types/index'
 import {
   formatCurrency,
   formatSignedCurrency,
@@ -36,8 +39,19 @@ function getGainColorClass(value: number): string {
   return 'text-sv-text'
 }
 
-export function PortfolioSummary() {
-  const { summary, isLoading } = usePortfolioStats()
+interface PortfolioSummaryProps {
+  readonly filteredPositions?: ReadonlyArray<Position>
+  readonly quotes?: Readonly<Record<string, Quote>>
+}
+
+export function PortfolioSummary({ filteredPositions, quotes }: PortfolioSummaryProps = {}) {
+  const { summary: allSummary, isLoading } = usePortfolioStats()
+
+  const summary = useMemo(() => {
+    if (!filteredPositions || !quotes) return allSummary
+    const quotesArray = Object.values(quotes)
+    return computePortfolioSummary(filteredPositions, quotesArray)
+  }, [filteredPositions, quotes, allSummary])
 
   if (isLoading) {
     return (

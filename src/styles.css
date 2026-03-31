@@ -37,3 +37,37 @@ body {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Number flash animations for price changes */
+@keyframes flash-positive {
+  0% { background-color: rgba(34, 197, 94, 0.3); }
+  100% { background-color: transparent; }
+}
+@keyframes flash-negative {
+  0% { background-color: rgba(239, 68, 68, 0.3); }
+  100% { background-color: transparent; }
+}
+.flash-positive { animation: flash-positive 600ms ease-out; }
+.flash-negative { animation: flash-negative 600ms ease-out; }
+
+/* Focus styles for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid var(--color-sv-accent);
+  outline-offset: 2px;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-sv-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-sv-border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-sv-text-muted);
+}

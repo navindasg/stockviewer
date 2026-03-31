@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { usePortfolioStats } from '../../hooks/usePortfolioStats'
 import {
@@ -50,18 +50,108 @@ function PlusIcon() {
   )
 }
 
-function StaleIndicator() {
+function isUSMarketOpen(now: Date): boolean {
+  const day = now.getDay()
+  if (day === 0 || day === 6) return false
+
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+  const hours = et.getHours()
+  const minutes = et.getMinutes()
+  const totalMinutes = hours * 60 + minutes
+
+  const marketOpen = 9 * 60 + 30
+  const marketClose = 16 * 60
+
+  return totalMinutes >= marketOpen && totalMinutes < marketClose
+}
+
+function formatLastClosedDate(): string {
+  const now = new Date()
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+  const day = et.getDay()
+  const hours = et.getHours()
+  const minutes = et.getMinutes()
+  const totalMinutes = hours * 60 + minutes
+
+  const date = new Date(et)
+  if (day === 0) {
+    date.setDate(date.getDate() - 2)
+  } else if (day === 6) {
+    date.setDate(date.getDate() - 1)
+  } else if (totalMinutes < 9 * 60 + 30) {
+    if (day === 1) {
+      date.setDate(date.getDate() - 3)
+    } else {
+      date.setDate(date.getDate() - 1)
+    }
+  }
+
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function MarketHoursIndicator() {
+  const marketOpen = useMemo(() => isUSMarketOpen(new Date()), [])
+  const closedDate = useMemo(() => (marketOpen ? '' : formatLastClosedDate()), [marketOpen])
+
+  if (marketOpen) {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-sv-positive">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-sv-positive animate-pulse" />
+        Market Open
+      </span>
+    )
+  }
+
   return (
-    <span
-      className="inline-block w-2 h-2 rounded-full bg-sv-warning ml-2"
-      title="Market data may be stale (last updated over 15 minutes ago)"
-    />
+    <span className="flex items-center gap-1.5 text-xs text-sv-text-muted">
+      <span className="inline-block w-1.5 h-1.5 rounded-full bg-sv-text-muted" />
+      Market Closed
+      {closedDate && <span className="text-sv-text-muted">&middot; As of {closedDate}</span>}
+    </span>
   )
+}
+
+function formatTimeSince(timestamp: number): string {
+  const diffMs = Date.now() - timestamp
+  const diffMinutes = Math.floor(diffMs / 60_000)
+
+  if (diffMinutes < 1) return 'Updated just now'
+  if (diffMinutes < 60) return `Updated ${diffMinutes}m ago`
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `Updated ${diffHours}h ago`
+  return `Updated ${Math.floor(diffHours / 24)}d ago`
 }
 
 function isDataStale(quotesLastFetched: number | null): boolean {
   if (quotesLastFetched === null) return true
   return Date.now() - quotesLastFetched > STALE_THRESHOLD_MS
+}
+
+interface StaleIndicatorProps {
+  readonly quotesLastFetched: number | null
+  readonly onRefresh: () => void
+}
+
+function StaleIndicator({ quotesLastFetched, onRefresh }: StaleIndicatorProps) {
+  const timeSince = quotesLastFetched !== null
+    ? formatTimeSince(quotesLastFetched)
+    : 'No data loaded'
+
+  return (
+    <button
+      type="button"
+      onClick={onRefresh}
+      className="
+        flex items-center gap-1.5 px-2 py-0.5 rounded
+        text-xs text-sv-warning hover:bg-sv-elevated
+        transition-colors duration-150 cursor-pointer
+      "
+      title="Click to refresh market data"
+    >
+      <span className="inline-block w-2 h-2 rounded-full bg-sv-warning" />
+      {timeSince}
+    </button>
+  )
 }
 
 export function TopBar() {
@@ -99,7 +189,7 @@ export function TopBar() {
           <span className="font-mono text-lg font-semibold text-sv-text tabular-nums">
             {isLoading ? '--' : formatCurrency(summary.totalValue)}
           </span>
-          {stale && <StaleIndicator />}
+          {stale && <StaleIndicator quotesLastFetched={quotesLastFetched} onRefresh={handleRefresh} />}
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -114,6 +204,8 @@ export function TopBar() {
               : `${formatSignedCurrency(summary.totalDayChange)} (${formatPercent(summary.totalDayChangePercent)})`}
           </span>
         </div>
+
+        <MarketHoursIndicator />
       </div>
 
       <div className="flex items-center gap-2">
@@ -124,7 +216,7 @@ export function TopBar() {
             text-sv-text-secondary hover:text-sv-text hover:bg-sv-elevated
             transition-colors duration-150 ease-in-out cursor-pointer
           "
-          title="Refresh market data"
+          title="Refresh market data (Ctrl+R)"
         >
           <RefreshIcon />
         </button>
@@ -137,6 +229,7 @@ export function TopBar() {
             hover:brightness-110
             transition-all duration-150 ease-in-out cursor-pointer
           "
+          title="Add Transaction (Ctrl+N)"
         >
           <PlusIcon />
           <span>Add Transaction</span>
