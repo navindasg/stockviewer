@@ -3,30 +3,23 @@ import { useAppStore, type ViewName } from '../../stores/appStore'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { AddTransactionModal } from '../Forms/AddTransactionModal'
-
-function ViewPlaceholder({ name }: { readonly name: string }) {
-  return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-center">
-        <h2 className="text-xl font-semibold text-sv-text mb-1">{name}</h2>
-        <p className="text-sv-text-secondary text-sm">View coming soon</p>
-      </div>
-    </div>
-  )
-}
+import { DashboardView } from '../Views/DashboardView'
+import { PositionDetail } from '../Positions/PositionDetail'
+import { CompareView } from '../Views/CompareView'
+import { TransactionsView } from '../Views/TransactionsView'
 
 function renderView(activeView: ViewName) {
   switch (activeView) {
     case 'dashboard':
-      return <ViewPlaceholder name="Dashboard" />
+      return <DashboardView />
     case 'position-detail':
-      return <ViewPlaceholder name="Position Detail" />
+      return <PositionDetail />
     case 'compare':
-      return <ViewPlaceholder name="Compare" />
+      return <CompareView />
     case 'transactions':
-      return <ViewPlaceholder name="Transactions" />
+      return <TransactionsView />
     default:
-      return <ViewPlaceholder name="Dashboard" />
+      return <DashboardView />
   }
 }
 
