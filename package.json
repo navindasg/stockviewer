@@ -1,0 +1,31 @@
+{
+  "name": "stock-viewer",
+  "version": "1.0.0",
+  "description": "Desktop stock portfolio tracker with Bloomberg-inspired dark UI",
+  "main": "./out/main/main.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-sqlite3": "12.8.0",
+    "date-fns": "4.1.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "recharts": "3.8.1",
+    "zustand": "5.0.12"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.2.2",
+    "@types/better-sqlite3": "7.6.13",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.2.0",
+    "electron": "35.7.5",
+    "electron-vite": "5.0.0",
+    "tailwindcss": "4.2.2",
+    "typescript": "5.9.3"
+  }
+}

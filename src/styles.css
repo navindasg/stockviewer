@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme {
+  /* Background colors */
+  --color-sv-bg: #0A0E17;
+  --color-sv-surface: #111827;
+  --color-sv-elevated: #1A2235;
+  --color-sv-border: #1E2A3A;
+
+  /* Text colors */
+  --color-sv-text: #E5E7EB;
+  --color-sv-text-secondary: #9CA3AF;
+  --color-sv-text-muted: #6B7280;
+
+  /* Accent colors */
+  --color-sv-positive: #22C55E;
+  --color-sv-negative: #EF4444;
+  --color-sv-accent: #3B82F6;
+  --color-sv-warning: #F59E0B;
+
+  /* Typography */
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-sv-bg);
+  color: var(--color-sv-text);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Tabular numbers for financial data */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

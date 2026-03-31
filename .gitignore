@@ -1,0 +1,32 @@
+prd.md
+tasks/
+
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+
+# Environment
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
