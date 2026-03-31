@@ -48,6 +48,22 @@ export function upsertPrices(ticker: string, prices: ReadonlyArray<PricePoint>):
   insertMany(prices)
 }
 
+export interface TickerMetadataRow {
+  readonly company_name: string | null
+  readonly sector: string | null
+  readonly industry: string | null
+  readonly color: string | null
+}
+
+export function getTickerMetadata(ticker: string): TickerMetadataRow | null {
+  const db = getDatabase()
+  const row = db.prepare(
+    'SELECT company_name, sector, industry, color FROM ticker_metadata WHERE ticker = ?'
+  ).get(ticker.toUpperCase()) as TickerMetadataRow | undefined
+
+  return row ?? null
+}
+
 export function upsertTickerMetadata(
   ticker: string,
   metadata: { companyName?: string; sector?: string; industry?: string; color?: string }

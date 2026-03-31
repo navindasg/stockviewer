@@ -60,6 +60,8 @@ export interface Quote {
   readonly companyName: string
   readonly sector: string | null
   readonly marketCap: number | null
+  readonly isStale?: boolean
+  readonly offline?: boolean
 }
 
 export interface PricePoint {

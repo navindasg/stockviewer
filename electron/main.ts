@@ -2,8 +2,8 @@ import { app, BrowserWindow, ipcMain, session } from 'electron'
 import { join } from 'path'
 import { initDatabase, closeDatabase } from './db/database'
 import { addTransaction, updateTransaction, deleteTransaction, getTransactions, getPositions } from './db/positions'
-import { getCachedPrices, getLatestCachedDate, upsertPrices, upsertTickerMetadata } from './db/priceCache'
 import type { NewTransaction, TransactionFilters } from '../src/types/index'
+import { getQuote, getQuotes, getHistoricalPrices, searchTicker, isQuoteStale, getCachedQuote } from './marketData'
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -65,21 +65,36 @@ function registerIpcHandlers(): void {
     }
   })
 
-  // Market data stubs — will be implemented in Task 4 (Yahoo Finance integration)
-  ipcMain.handle('market:getQuote', (_event, _ticker: string) => {
-    return null
+  ipcMain.handle('market:getQuote', async (_event, ticker: string) => {
+    try {
+      const quote = await getQuote(ticker)
+      return { ...quote, isStale: isQuoteStale(ticker) }
+    } catch {
+      const cached = getCachedQuote(ticker)
+      if (cached) {
+        return { ...cached, offline: true, isStale: true }
+      }
+      throw new Error(`Unable to fetch quote for ${ticker}`)
+    }
   })
 
-  ipcMain.handle('market:getQuotes', (_event, _tickers: string[]) => {
-    return []
+  ipcMain.handle('market:getQuotes', async (_event, tickers: string[]) => {
+    try {
+      return await getQuotes(tickers)
+    } catch {
+      return tickers
+        .map((t) => getCachedQuote(t))
+        .filter((q): q is NonNullable<typeof q> => q !== null)
+        .map((q) => ({ ...q, offline: true, isStale: true }))
+    }
   })
 
-  ipcMain.handle('market:getHistoricalPrices', (_event, ticker: string, from: string, to: string) => {
-    return getCachedPrices(ticker, from, to)
+  ipcMain.handle('market:getHistoricalPrices', async (_event, ticker: string, from: string, to: string) => {
+    return getHistoricalPrices(ticker, from, to)
   })
 
-  ipcMain.handle('market:searchTicker', (_event, _query: string) => {
-    return []
+  ipcMain.handle('market:searchTicker', async (_event, query: string) => {
+    return searchTicker(query)
   })
 }
 
