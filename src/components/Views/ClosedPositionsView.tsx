@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { addMonths, differenceInCalendarDays, differenceInMonths, differenceInYears, parseISO } from 'date-fns'
 import { useAppStore } from '../../stores/appStore'
+import { TaxReportPanel } from '../TaxLots/TaxReportExport'
 import type { Position } from '../../types/index'
 import {
   formatCurrency,
@@ -15,6 +16,8 @@ type SortField =
   | 'closeDate'
   | 'holdingPeriodDays'
   | 'totalInvested'
+  | 'shortTermGain'
+  | 'longTermGain'
   | 'totalRealized'
   | 'returnPct'
 
@@ -100,6 +103,8 @@ function getSortValue(item: EnrichedClosed, field: SortField): number | string {
     case 'closeDate': return item.position.lastSellDate ?? ''
     case 'holdingPeriodDays': return item.holdingPeriodDays
     case 'totalInvested': return item.position.totalInvested
+    case 'shortTermGain': return item.position.shortTermGain
+    case 'longTermGain': return item.position.longTermGain
     case 'totalRealized': return item.position.totalRealized
     case 'returnPct': return item.returnPct
   }
@@ -124,6 +129,8 @@ const COLUMNS: ReadonlyArray<{
   { field: 'closeDate', label: 'Close Date', align: 'text-right' },
   { field: 'holdingPeriodDays', label: 'Holding Period', align: 'text-right' },
   { field: 'totalInvested', label: 'Total Invested', align: 'text-right' },
+  { field: 'shortTermGain', label: 'ST Gain', align: 'text-right' },
+  { field: 'longTermGain', label: 'LT Gain', align: 'text-right' },
   { field: 'totalRealized', label: 'Realized P&L', align: 'text-right' },
   { field: 'returnPct', label: 'Return %', align: 'text-right' }
 ] as const
@@ -184,6 +191,12 @@ function ClosedRow({ item, onClick, striped }: ClosedRowProps) {
       </td>
       <td className="px-4 py-3 text-right font-mono tabular-nums text-sv-text">
         {formatCurrency(position.totalInvested)}
+      </td>
+      <td className={`px-4 py-3 text-right font-mono tabular-nums ${getGainClass(position.shortTermGain)}`}>
+        {formatSignedCurrency(position.shortTermGain)}
+      </td>
+      <td className={`px-4 py-3 text-right font-mono tabular-nums ${getGainClass(position.longTermGain)}`}>
+        {formatSignedCurrency(position.longTermGain)}
       </td>
       <td className={`px-4 py-3 text-right font-mono tabular-nums ${getGainClass(position.totalRealized)}`}>
         {formatSignedCurrency(position.totalRealized)}
@@ -257,6 +270,8 @@ export function ClosedPositionsView() {
           </span>
         </div>
       </div>
+
+      <TaxReportPanel />
 
       <div className="rounded-lg bg-sv-surface border border-sv-border overflow-x-auto">
         <table className="w-full text-sm">

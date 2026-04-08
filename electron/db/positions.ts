@@ -1,16 +1,27 @@
 import { randomUUID } from 'crypto'
-import type { Transaction, NewTransaction, TransactionFilters, Position } from '../../src/types/index'
+import type { Transaction, NewTransaction, TransactionFilters, Position, CostBasisMethod } from '../../src/types/index'
 import { getDatabase } from './database'
+import {
+  createTaxLot,
+  assignLotsForSell,
+  getCostBasisMethod,
+  removeAssignmentsForTransaction,
+  recomputeLotsForTicker
+} from './taxLots'
 
-export function addTransaction(tx: NewTransaction): Transaction {
+export function addTransaction(
+  tx: NewTransaction,
+  lotSelections?: ReadonlyArray<{ lotId: string; shares: number }>
+): Transaction {
   const db = getDatabase()
   const id = randomUUID()
   const now = new Date().toISOString()
   const fees = tx.fees ?? 0
   const notes = tx.notes ?? null
+  const ticker = tx.ticker.toUpperCase()
 
   if (tx.type === 'SELL') {
-    validateSell(tx.ticker, tx.shares, tx.date)
+    validateSell(ticker, tx.shares, tx.date)
   }
 
   const stmt = db.prepare(`
@@ -18,11 +29,11 @@ export function addTransaction(tx: NewTransaction): Transaction {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
-  stmt.run(id, tx.ticker.toUpperCase(), tx.type, tx.shares, tx.price, tx.date, fees, notes, now, now)
+  stmt.run(id, ticker, tx.type, tx.shares, tx.price, tx.date, fees, notes, now, now)
 
-  return {
+  const transaction: Transaction = {
     id,
-    ticker: tx.ticker.toUpperCase(),
+    ticker,
     type: tx.type,
     shares: tx.shares,
     price: tx.price,
@@ -32,6 +43,15 @@ export function addTransaction(tx: NewTransaction): Transaction {
     created_at: now,
     updated_at: now
   }
+
+  if (tx.type === 'BUY') {
+    createTaxLot(transaction)
+  } else {
+    const method = getCostBasisMethod(ticker)
+    assignLotsForSell(transaction, method, lotSelections)
+  }
+
+  return transaction
 }
 
 export function updateTransaction(id: string, updates: Partial<NewTransaction>): Transaction {
@@ -58,11 +78,18 @@ export function updateTransaction(id: string, updates: Partial<NewTransaction>):
 
   const now = new Date().toISOString()
 
-  db.prepare(`
-    UPDATE transactions
-    SET ticker = ?, type = ?, shares = ?, price = ?, date = ?, fees = ?, notes = ?, updated_at = ?
-    WHERE id = ?
-  `).run(merged.ticker, merged.type, merged.shares, merged.price, merged.date, merged.fees, merged.notes, now, id)
+  db.transaction(() => {
+    db.prepare(`
+      UPDATE transactions
+      SET ticker = ?, type = ?, shares = ?, price = ?, date = ?, fees = ?, notes = ?, updated_at = ?
+      WHERE id = ?
+    `).run(merged.ticker, merged.type, merged.shares, merged.price, merged.date, merged.fees, merged.notes, now, id)
+
+    recomputeLotsForTicker(merged.ticker)
+    if (existing.ticker !== merged.ticker) {
+      recomputeLotsForTicker(existing.ticker)
+    }
+  })()
 
   return {
     id,
@@ -80,10 +107,17 @@ export function updateTransaction(id: string, updates: Partial<NewTransaction>):
 
 export function deleteTransaction(id: string): void {
   const db = getDatabase()
-  const result = db.prepare('DELETE FROM transactions WHERE id = ?').run(id)
-  if (result.changes === 0) {
+
+  const existing = db.prepare('SELECT * FROM transactions WHERE id = ?').get(id) as Transaction | undefined
+  if (!existing) {
     throw new Error(`Transaction ${id} not found`)
   }
+
+  db.transaction(() => {
+    removeAssignmentsForTransaction(id)
+    db.prepare('DELETE FROM transactions WHERE id = ?').run(id)
+    recomputeLotsForTicker(existing.ticker)
+  })()
 }
 
 export function getTransactions(filters?: TransactionFilters): ReadonlyArray<Transaction> {
@@ -127,34 +161,57 @@ function computePosition(ticker: string): Position {
     'SELECT * FROM transactions WHERE ticker = ? ORDER BY date ASC, created_at ASC'
   ).all(ticker) as Transaction[]
 
-  let totalBuyShares = 0
-  let totalBuyCost = 0
-  let totalRealized = 0
   let firstBuyDate: string | null = null
   let lastSellDate: string | null = null
 
   for (const tx of transactions) {
     if (tx.type === 'BUY') {
-      totalBuyCost += tx.shares * tx.price
-      totalBuyShares += tx.shares
       if (firstBuyDate === null || tx.date < firstBuyDate) {
         firstBuyDate = tx.date
       }
     } else {
-      const avgCost = totalBuyShares > 0 ? totalBuyCost / totalBuyShares : 0
-      totalRealized += (tx.price - avgCost) * tx.shares
-      totalBuyCost -= avgCost * tx.shares
-      totalBuyShares -= tx.shares
       if (lastSellDate === null || tx.date > lastSellDate) {
         lastSellDate = tx.date
       }
     }
   }
 
-  const costBasis = totalBuyShares > 0 ? totalBuyCost / totalBuyShares : 0
   const totalInvested = transactions
     .filter((tx) => tx.type === 'BUY')
     .reduce((sum, tx) => sum + tx.shares * tx.price, 0)
+
+  const remainingLots = db.prepare(
+    'SELECT remaining_shares, cost_per_share FROM tax_lots WHERE ticker = ? AND remaining_shares > 0'
+  ).all(ticker) as ReadonlyArray<{ remaining_shares: number; cost_per_share: number }>
+
+  let totalShares = 0
+  let totalRemainingCost = 0
+  for (const lot of remainingLots) {
+    totalShares += lot.remaining_shares
+    totalRemainingCost += lot.remaining_shares * lot.cost_per_share
+  }
+  const costBasis = totalShares > 0 ? totalRemainingCost / totalShares : 0
+
+  const assignments = db.prepare(`
+    SELECT la.realized_gain, la.is_short_term FROM lot_assignments la
+    JOIN tax_lots tl ON la.tax_lot_id = tl.id
+    WHERE tl.ticker = ?
+  `).all(ticker) as ReadonlyArray<{ realized_gain: number; is_short_term: number }>
+
+  let totalRealized = 0
+  let shortTermGain = 0
+  let longTermGain = 0
+
+  for (const a of assignments) {
+    totalRealized += a.realized_gain
+    if (a.is_short_term === 1) {
+      shortTermGain += a.realized_gain
+    } else {
+      longTermGain += a.realized_gain
+    }
+  }
+
+  const method = getCostBasisMethod(ticker)
 
   const metadata = db.prepare('SELECT company_name, color FROM ticker_metadata WHERE ticker = ?').get(ticker) as
     | { company_name: string | null; color: string | null }
@@ -163,11 +220,14 @@ function computePosition(ticker: string): Position {
   return {
     ticker,
     companyName: metadata?.company_name ?? ticker,
-    totalShares: totalBuyShares,
+    totalShares,
     costBasis,
     totalInvested,
     totalRealized,
-    status: totalBuyShares > 0 ? 'OPEN' : 'CLOSED',
+    shortTermGain,
+    longTermGain,
+    costBasisMethod: method,
+    status: totalShares > 0 ? 'OPEN' : 'CLOSED',
     color: metadata?.color ?? '#3B82F6',
     firstBuyDate,
     lastSellDate

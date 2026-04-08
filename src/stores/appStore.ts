@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Position, Quote, NewTransaction } from '../types/index'
+import type { Position, Quote, NewTransaction, TaxLot, CostBasisMethod, TaxReportSummary } from '../types/index'
 
 export type ViewName = 'dashboard' | 'position-detail' | 'compare' | 'transactions' | 'closed-positions' | 'watchlist'
 export type GainStatus = 'all' | 'winners' | 'losers'
@@ -30,12 +30,16 @@ interface AppState {
   readonly sidebarCollapsed: boolean
   readonly activeView: ViewName
   readonly modalOpen: boolean
+  readonly taxLots: ReadonlyArray<TaxLot>
+  readonly taxLotsLoading: boolean
+  readonly taxReport: TaxReportSummary | null
 }
 
 interface AppActions {
   readonly fetchPositions: () => Promise<void>
   readonly fetchQuotes: (tickers: ReadonlyArray<string>) => Promise<void>
   readonly addTransaction: (tx: NewTransaction) => Promise<void>
+  readonly addTransactionWithLots: (tx: NewTransaction, lotSelections?: ReadonlyArray<{ lotId: string; shares: number }>) => Promise<void>
   readonly updateTransaction: (id: string, updates: Partial<NewTransaction>) => Promise<void>
   readonly deleteTransaction: (id: string) => Promise<void>
   readonly setFilter: <K extends keyof FilterState>(key: K, value: FilterState[K]) => void
@@ -44,6 +48,10 @@ interface AppActions {
   readonly setSelectedTicker: (ticker: string | null) => void
   readonly toggleSidebar: () => void
   readonly setModalOpen: (open: boolean) => void
+  readonly fetchTaxLots: (ticker: string) => Promise<void>
+  readonly setCostBasisMethod: (ticker: string, method: CostBasisMethod) => Promise<void>
+  readonly fetchTaxReport: (year?: number) => Promise<void>
+  readonly exportTaxReportCsv: (year?: number) => Promise<string>
 }
 
 type AppStore = AppState & AppActions
@@ -58,6 +66,9 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   sidebarCollapsed: false,
   activeView: 'dashboard',
   modalOpen: false,
+  taxLots: [],
+  taxLotsLoading: false,
+  taxReport: null,
 
   fetchPositions: async () => {
     set({ positionsLoading: true })
@@ -91,6 +102,17 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   addTransaction: async (tx: NewTransaction) => {
     try {
       await window.electronAPI.addTransaction(tx)
+      await get().fetchPositions()
+    } catch (error) {
+      throw new Error(
+        `Failed to add transaction: ${error instanceof Error ? error.message : String(error)}`
+      )
+    }
+  },
+
+  addTransactionWithLots: async (tx: NewTransaction, lotSelections?: ReadonlyArray<{ lotId: string; shares: number }>) => {
+    try {
+      await window.electronAPI.addTransactionWithLots(tx, lotSelections)
       await get().fetchPositions()
     } catch (error) {
       throw new Error(
@@ -145,5 +167,51 @@ export const useAppStore = create<AppStore>()((set, get) => ({
 
   setModalOpen: (open: boolean) => {
     set({ modalOpen: open })
+  },
+
+  fetchTaxLots: async (ticker: string) => {
+    set({ taxLotsLoading: true })
+    try {
+      const taxLots = await window.electronAPI.getTaxLots(ticker)
+      set({ taxLots, taxLotsLoading: false })
+    } catch (error) {
+      set({ taxLotsLoading: false })
+      throw new Error(
+        `Failed to fetch tax lots: ${error instanceof Error ? error.message : String(error)}`
+      )
+    }
+  },
+
+  setCostBasisMethod: async (ticker: string, method: CostBasisMethod) => {
+    try {
+      await window.electronAPI.setCostBasisMethod(ticker, method)
+      await get().fetchPositions()
+      await get().fetchTaxLots(ticker)
+    } catch (error) {
+      throw new Error(
+        `Failed to set cost basis method: ${error instanceof Error ? error.message : String(error)}`
+      )
+    }
+  },
+
+  fetchTaxReport: async (year?: number) => {
+    try {
+      const taxReport = await window.electronAPI.generateTaxReport(year) as TaxReportSummary
+      set({ taxReport })
+    } catch (error) {
+      throw new Error(
+        `Failed to generate tax report: ${error instanceof Error ? error.message : String(error)}`
+      )
+    }
+  },
+
+  exportTaxReportCsv: async (year?: number) => {
+    try {
+      return await window.electronAPI.exportTaxReportCsv(year)
+    } catch (error) {
+      throw new Error(
+        `Failed to export tax report: ${error instanceof Error ? error.message : String(error)}`
+      )
+    }
   }
 }))

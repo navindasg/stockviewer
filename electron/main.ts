@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain, session } from 'electron'
+import { app, BrowserWindow, ipcMain, session, dialog } from 'electron'
 import { join } from 'path'
+import { writeFileSync } from 'fs'
 import { initDatabase, closeDatabase } from './db/database'
 import { addTransaction, updateTransaction, deleteTransaction, getTransactions, getPositions } from './db/positions'
 import {
@@ -9,7 +10,17 @@ import {
   updateWatchlistItem,
   reorderWatchlistItems
 } from './db/watchlist'
-import type { NewTransaction, TransactionFilters } from '../src/types/index'
+import {
+  getTaxLots,
+  getLotAssignments,
+  getAvailableLots,
+  setCostBasisMethod,
+  getCostBasisMethod,
+  recomputeLotsForTicker
+} from './db/taxLots'
+import { runTaxLotBackfill } from './db/taxLotMigration'
+import { generateTaxReport, generateTaxReportCsv } from './db/taxReport'
+import type { NewTransaction, TransactionFilters, CostBasisMethod } from '../src/types/index'
 import { getQuote, getQuotes, getHistoricalPrices, searchTicker, isQuoteStale, getCachedQuote } from './marketData'
 
 function createWindow(): BrowserWindow {
@@ -37,16 +48,43 @@ function createWindow(): BrowserWindow {
   return win
 }
 
+function validateTransactionInput(tx: unknown): void {
+  if (!tx || typeof tx !== 'object') throw new Error('Invalid input')
+  const { ticker, type, shares, price, date } = tx as Record<string, unknown>
+  if (typeof ticker !== 'string' || ticker.length === 0 || ticker.length > 10) throw new Error('Invalid ticker')
+  if (type !== 'BUY' && type !== 'SELL') throw new Error('Invalid type')
+  if (typeof shares !== 'number' || shares <= 0) throw new Error('Invalid shares')
+  if (typeof price !== 'number' || price <= 0) throw new Error('Invalid price')
+  if (typeof date !== 'string' || date.length === 0) throw new Error('Invalid date')
+}
+
 function registerIpcHandlers(): void {
-  ipcMain.handle('db:addTransaction', (_event, tx: NewTransaction) => {
-    return addTransaction(tx)
+  ipcMain.handle('db:addTransaction', (_event, tx: unknown) => {
+    validateTransactionInput(tx)
+    return addTransaction(tx as NewTransaction)
   })
 
-  ipcMain.handle('db:updateTransaction', (_event, id: string, updates: Partial<NewTransaction>) => {
-    return updateTransaction(id, updates)
+  ipcMain.handle('db:addTransactionWithLots', (_event, tx: unknown, lotSelections?: ReadonlyArray<{ lotId: string; shares: number }>) => {
+    validateTransactionInput(tx)
+    if (lotSelections !== undefined) {
+      if (!Array.isArray(lotSelections)) throw new Error('Invalid lot selections')
+      for (const sel of lotSelections) {
+        if (!sel || typeof sel !== 'object') throw new Error('Invalid lot selection')
+        if (typeof sel.lotId !== 'string' || sel.lotId.length === 0) throw new Error('Invalid lot ID')
+        if (typeof sel.shares !== 'number' || sel.shares <= 0) throw new Error('Invalid lot shares')
+      }
+    }
+    return addTransaction(tx as NewTransaction, lotSelections)
   })
 
-  ipcMain.handle('db:deleteTransaction', (_event, id: string) => {
+  ipcMain.handle('db:updateTransaction', (_event, id: unknown, updates: unknown) => {
+    if (typeof id !== 'string' || id.length === 0) throw new Error('Invalid id')
+    if (!updates || typeof updates !== 'object') throw new Error('Invalid updates')
+    return updateTransaction(id, updates as Partial<NewTransaction>)
+  })
+
+  ipcMain.handle('db:deleteTransaction', (_event, id: unknown) => {
+    if (typeof id !== 'string' || id.length === 0) throw new Error('Invalid id')
     deleteTransaction(id)
   })
 
@@ -104,6 +142,59 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('market:searchTicker', async (_event, query: string) => {
     return searchTicker(query)
+  })
+
+  ipcMain.handle('db:getTaxLots', (_event, ticker: string) => {
+    if (typeof ticker !== 'string' || ticker.length === 0) throw new Error('Invalid ticker')
+    return getTaxLots(ticker.toUpperCase())
+  })
+
+  ipcMain.handle('db:getLotAssignments', (_event, sellTransactionId: string) => {
+    if (typeof sellTransactionId !== 'string' || sellTransactionId.length === 0) throw new Error('Invalid transaction ID')
+    return getLotAssignments(sellTransactionId)
+  })
+
+  ipcMain.handle('db:getAvailableLots', (_event, ticker: string) => {
+    if (typeof ticker !== 'string' || ticker.length === 0) throw new Error('Invalid ticker')
+    return getAvailableLots(ticker.toUpperCase())
+  })
+
+  ipcMain.handle('db:setCostBasisMethod', (_event, ticker: string, method: CostBasisMethod) => {
+    if (typeof ticker !== 'string' || ticker.length === 0) throw new Error('Invalid ticker')
+    const validMethods = ['FIFO', 'LIFO', 'AVGCOST', 'SPECIFIC']
+    if (!validMethods.includes(method)) throw new Error('Invalid cost basis method')
+    setCostBasisMethod(ticker.toUpperCase(), method)
+    recomputeLotsForTicker(ticker.toUpperCase())
+  })
+
+  ipcMain.handle('db:getCostBasisMethod', (_event, ticker: string) => {
+    if (typeof ticker !== 'string' || ticker.length === 0) throw new Error('Invalid ticker')
+    return getCostBasisMethod(ticker.toUpperCase())
+  })
+
+  ipcMain.handle('db:generateTaxReport', (_event, year?: number) => {
+    if (year !== undefined && (typeof year !== 'number' || year < 1900 || year > 2100)) {
+      throw new Error('Invalid year')
+    }
+    return generateTaxReport(year)
+  })
+
+  ipcMain.handle('db:exportTaxReportCsv', async (_event, year?: number) => {
+    if (year !== undefined && (typeof year !== 'number' || year < 1900 || year > 2100)) {
+      throw new Error('Invalid year')
+    }
+    const csv = generateTaxReportCsv(year)
+    const yearLabel = year ?? 'all-years'
+    const result = await dialog.showSaveDialog({
+      title: 'Export Tax Report',
+      defaultPath: `tax-report-${yearLabel}.csv`,
+      filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+    })
+    if (result.canceled || !result.filePath) {
+      return ''
+    }
+    writeFileSync(result.filePath, csv, 'utf-8')
+    return result.filePath
   })
 
   ipcMain.handle('db:getWatchlist', () => {
@@ -179,6 +270,7 @@ function registerIpcHandlers(): void {
 
 app.whenReady().then(() => {
   initDatabase()
+  runTaxLotBackfill()
   registerIpcHandlers()
 
   session.defaultSession.webRequest.onHeadersReceived((_details, callback) => {

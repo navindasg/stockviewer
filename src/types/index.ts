@@ -1,4 +1,56 @@
-// TypeScript interfaces — will be fully implemented in Task 3
+// TypeScript interfaces
+
+export type CostBasisMethod = 'FIFO' | 'LIFO' | 'AVGCOST' | 'SPECIFIC'
+
+export interface TaxLot {
+  readonly id: string
+  readonly transactionId: string
+  readonly ticker: string
+  readonly acquisitionDate: string
+  readonly shares: number
+  readonly costPerShare: number
+  readonly remainingShares: number
+  readonly createdAt: string
+}
+
+export interface LotAssignment {
+  readonly id: string
+  readonly sellTransactionId: string
+  readonly taxLotId: string
+  readonly sharesConsumed: number
+  readonly costPerShare: number
+  readonly proceedsPerShare: number
+  readonly realizedGain: number
+  readonly isShortTerm: boolean
+  readonly isWashSale: boolean
+  readonly washSaleAdjustment: number
+  readonly createdAt: string
+}
+
+export interface TaxReportRow {
+  readonly ticker: string
+  readonly companyName: string
+  readonly description: string
+  readonly dateAcquired: string
+  readonly dateSold: string
+  readonly proceeds: number
+  readonly costBasis: number
+  readonly adjustmentCode: string
+  readonly adjustmentAmount: number
+  readonly gainOrLoss: number
+  readonly isShortTerm: boolean
+  readonly isWashSale: boolean
+}
+
+export interface TaxReportSummary {
+  readonly rows: ReadonlyArray<TaxReportRow>
+  readonly totalShortTermGain: number
+  readonly totalLongTermGain: number
+  readonly totalWashSaleAdjustment: number
+  readonly totalProceeds: number
+  readonly totalCostBasis: number
+  readonly totalGainOrLoss: number
+}
 
 export interface ElectronAPI {
   getTransactions: (filters?: TransactionFilters) => Promise<Transaction[]>
@@ -16,6 +68,14 @@ export interface ElectronAPI {
   removeWatchlistItem: (id: string) => Promise<void>
   updateWatchlistItem: (id: string, updates: { notes?: string | null }) => Promise<WatchlistItem>
   reorderWatchlist: (orderedIds: string[]) => Promise<void>
+  getTaxLots: (ticker: string) => Promise<TaxLot[]>
+  getLotAssignments: (sellTransactionId: string) => Promise<LotAssignment[]>
+  getAvailableLots: (ticker: string) => Promise<TaxLot[]>
+  setCostBasisMethod: (ticker: string, method: CostBasisMethod) => Promise<void>
+  getCostBasisMethod: (ticker: string) => Promise<CostBasisMethod>
+  generateTaxReport: (year?: number) => Promise<TaxReportSummary>
+  exportTaxReportCsv: (year?: number) => Promise<string>
+  addTransactionWithLots: (tx: NewTransaction, lotSelections?: ReadonlyArray<{ lotId: string; shares: number }>) => Promise<Transaction>
 }
 
 export type TransactionType = 'BUY' | 'SELL'
@@ -52,6 +112,9 @@ export interface Position {
   readonly costBasis: number
   readonly totalInvested: number
   readonly totalRealized: number
+  readonly shortTermGain: number
+  readonly longTermGain: number
+  readonly costBasisMethod: CostBasisMethod
   readonly status: PositionStatus
   readonly color: string
   readonly firstBuyDate: string | null

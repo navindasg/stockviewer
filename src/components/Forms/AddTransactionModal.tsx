@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { TickerSearch } from './TickerSearch'
+import { LotPicker } from '../TaxLots/LotPicker'
 import { getMaxDateTimeLocal, getNowLocalDateTimeString, INPUT_CLASS, INPUT_CLASS_NO_MONO, TEXTAREA_CLASS } from './formUtils'
-import type { TransactionType, SearchResult, Quote } from '../../types/index'
+import type { TransactionType, SearchResult, Quote, CostBasisMethod } from '../../types/index'
 
 interface AddTransactionModalProps {
   readonly isOpen: boolean
@@ -61,9 +62,11 @@ export function AddTransactionModal({ isOpen, onClose, prefillTicker }: AddTrans
   const [errors, setErrors] = useState<FormErrors>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [costBasisMethod, setCostBasisMethod] = useState<CostBasisMethod>('AVGCOST')
+  const [lotSelections, setLotSelections] = useState<ReadonlyArray<{ lotId: string; shares: number }>>([])
 
   const positions = useAppStore((state) => state.positions)
-  const addTransaction = useAppStore((state) => state.addTransaction)
+  const addTransactionWithLots = useAppStore((state) => state.addTransactionWithLots)
 
   const availableShares = form.type === 'SELL' && form.tickerValidated
     ? positions.find((p) => p.ticker === form.ticker)?.totalShares ?? 0
@@ -79,8 +82,18 @@ export function AddTransactionModal({ isOpen, onClose, prefillTicker }: AddTrans
       setErrors({})
       setSubmitError(null)
       setIsSubmitting(false)
+      setCostBasisMethod('AVGCOST')
+      setLotSelections([])
     }
   }, [isOpen, prefillTicker])
+
+  useEffect(() => {
+    if (form.tickerValidated && form.ticker) {
+      window.electronAPI.getCostBasisMethod(form.ticker)
+        .then((method) => setCostBasisMethod(method as CostBasisMethod))
+        .catch(() => setCostBasisMethod('AVGCOST'))
+    }
+  }, [form.tickerValidated, form.ticker])
 
   useEffect(() => {
     if (isOpen && prefillTicker) {
@@ -152,17 +165,30 @@ export function AddTransactionModal({ isOpen, onClose, prefillTicker }: AddTrans
 
     if (sellExceedsAvailable) return
 
+    const isSpecificSell = form.type === 'SELL' && costBasisMethod === 'SPECIFIC'
+    if (isSpecificSell) {
+      const totalSelected = lotSelections.reduce((sum, s) => sum + s.shares, 0)
+      const tolerance = 0.0001
+      if (Math.abs(totalSelected - parseFloat(form.shares)) > tolerance) {
+        setSubmitError('Selected lot shares must equal shares to sell')
+        return
+      }
+    }
+
     setIsSubmitting(true)
     try {
-      await addTransaction({
-        ticker: form.ticker,
-        type: form.type,
-        shares: parseFloat(form.shares),
-        price: parseFloat(form.price),
-        date: new Date(form.date).toISOString(),
-        fees: form.fees ? parseFloat(form.fees) : undefined,
-        notes: form.notes || undefined
-      })
+      await addTransactionWithLots(
+        {
+          ticker: form.ticker,
+          type: form.type,
+          shares: parseFloat(form.shares),
+          price: parseFloat(form.price),
+          date: new Date(form.date).toISOString(),
+          fees: form.fees ? parseFloat(form.fees) : undefined,
+          notes: form.notes || undefined
+        },
+        isSpecificSell ? lotSelections : undefined
+      )
       onClose()
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Failed to add transaction')
@@ -343,6 +369,23 @@ export function AddTransactionModal({ isOpen, onClose, prefillTicker }: AddTrans
               className={TEXTAREA_CLASS}
             />
           </div>
+
+          {form.type === 'SELL' && form.tickerValidated && costBasisMethod === 'SPECIFIC' && (
+            <LotPicker
+              ticker={form.ticker}
+              sharesToSell={form.shares ? parseFloat(form.shares) : 0}
+              onSelectionsChange={setLotSelections}
+              isVisible={true}
+            />
+          )}
+
+          {form.type === 'SELL' && form.tickerValidated && costBasisMethod !== 'SPECIFIC' && (
+            <div className="px-3 py-2 rounded-md bg-sv-surface border border-sv-border">
+              <p className="text-xs text-sv-text-muted">
+                Cost basis method: <span className="text-sv-text font-medium">{costBasisMethod}</span>
+              </p>
+            </div>
+          )}
 
           {submitError && (
             <div className="px-3 py-2 rounded-md bg-sv-negative/10 border border-sv-negative/20">
