@@ -20,8 +20,15 @@ import {
 } from './db/taxLots'
 import { runTaxLotBackfill } from './db/taxLotMigration'
 import { generateTaxReport, generateTaxReportCsv } from './db/taxReport'
-import type { NewTransaction, TransactionFilters, CostBasisMethod } from '../src/types/index'
-import { getQuote, getQuotes, getHistoricalPrices, searchTicker, isQuoteStale, getCachedQuote } from './marketData'
+import {
+  addDividend,
+  getDividends,
+  updateDividend,
+  deleteDividend,
+  getDividendSummary
+} from './db/dividends'
+import type { NewTransaction, TransactionFilters, CostBasisMethod, NewDividend, DividendFilters } from '../src/types/index'
+import { getQuote, getQuotes, getHistoricalPrices, searchTicker, isQuoteStale, getCachedQuote, getDividendHistory, getDividendInfo } from './marketData'
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -56,6 +63,17 @@ function validateTransactionInput(tx: unknown): void {
   if (typeof shares !== 'number' || shares <= 0) throw new Error('Invalid shares')
   if (typeof price !== 'number' || price <= 0) throw new Error('Invalid price')
   if (typeof date !== 'string' || date.length === 0) throw new Error('Invalid date')
+}
+
+function validateDividendInput(input: unknown): void {
+  if (!input || typeof input !== 'object') throw new Error('Invalid input')
+  const { ticker, exDate, payDate, amountPerShare, sharesAtDate, type } = input as Record<string, unknown>
+  if (typeof ticker !== 'string' || ticker.length === 0 || ticker.length > 10) throw new Error('Invalid ticker')
+  if (typeof exDate !== 'string' || exDate.length === 0) throw new Error('Invalid ex-date')
+  if (typeof payDate !== 'string' || payDate.length === 0) throw new Error('Invalid pay date')
+  if (typeof amountPerShare !== 'number' || amountPerShare <= 0) throw new Error('Invalid amount per share')
+  if (typeof sharesAtDate !== 'number' || sharesAtDate <= 0) throw new Error('Invalid shares')
+  if (type !== 'CASH' && type !== 'REINVESTED') throw new Error('Invalid dividend type')
 }
 
 function registerIpcHandlers(): void {
@@ -97,7 +115,6 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('db:getPortfolioSummary', () => {
-    // Stub — full implementation in Task 5 (Zustand store) with market data
     return {
       totalValue: 0,
       totalCost: 0,
@@ -106,6 +123,7 @@ function registerIpcHandlers(): void {
       totalUnrealizedGain: 0,
       totalUnrealizedGainPercent: 0,
       totalRealizedGain: 0,
+      totalDividendIncome: 0,
       totalReturn: 0,
       totalReturnPercent: 0,
       positionCount: 0
@@ -265,6 +283,56 @@ function registerIpcHandlers(): void {
       throw new Error('Invalid ordered IDs')
     }
     reorderWatchlistItems(orderedIds as string[])
+  })
+
+  ipcMain.handle('db:getDividends', (_event, filters?: unknown) => {
+    if (filters !== undefined) {
+      if (typeof filters !== 'object' || filters === null) throw new Error('Invalid filters')
+      const f = filters as Record<string, unknown>
+      if (f.ticker !== undefined && (typeof f.ticker !== 'string' || f.ticker.length === 0)) throw new Error('Invalid ticker filter')
+      if (f.type !== undefined && f.type !== 'CASH' && f.type !== 'REINVESTED') throw new Error('Invalid type filter')
+      if (f.fromDate !== undefined && typeof f.fromDate !== 'string') throw new Error('Invalid fromDate filter')
+      if (f.toDate !== undefined && typeof f.toDate !== 'string') throw new Error('Invalid toDate filter')
+    }
+    return getDividends(filters as DividendFilters | undefined)
+  })
+
+  ipcMain.handle('db:addDividend', (_event, input: unknown) => {
+    validateDividendInput(input)
+    return addDividend(input as NewDividend)
+  })
+
+  ipcMain.handle('db:updateDividend', (_event, id: unknown, updates: unknown) => {
+    if (typeof id !== 'string' || id.length === 0) throw new Error('Invalid id')
+    if (!updates || typeof updates !== 'object') throw new Error('Invalid updates')
+    const u = updates as Record<string, unknown>
+    if (u.ticker !== undefined && (typeof u.ticker !== 'string' || u.ticker.length === 0 || u.ticker.length > 10)) throw new Error('Invalid ticker')
+    if (u.amountPerShare !== undefined && (typeof u.amountPerShare !== 'number' || u.amountPerShare <= 0)) throw new Error('Invalid amount per share')
+    if (u.sharesAtDate !== undefined && (typeof u.sharesAtDate !== 'number' || u.sharesAtDate <= 0)) throw new Error('Invalid shares')
+    if (u.type !== undefined && u.type !== 'CASH' && u.type !== 'REINVESTED') throw new Error('Invalid dividend type')
+    if (u.exDate !== undefined && (typeof u.exDate !== 'string' || u.exDate.length === 0)) throw new Error('Invalid ex-date')
+    if (u.payDate !== undefined && (typeof u.payDate !== 'string' || u.payDate.length === 0)) throw new Error('Invalid pay date')
+    return updateDividend(id, updates as Partial<NewDividend>)
+  })
+
+  ipcMain.handle('db:deleteDividend', (_event, id: unknown) => {
+    if (typeof id !== 'string' || id.length === 0) throw new Error('Invalid id')
+    deleteDividend(id)
+  })
+
+  ipcMain.handle('db:getDividendSummary', () => {
+    return getDividendSummary()
+  })
+
+  ipcMain.handle('market:getDividendHistory', async (_event, ticker: string, from?: string) => {
+    if (typeof ticker !== 'string' || ticker.length === 0) throw new Error('Invalid ticker')
+    if (from !== undefined && typeof from !== 'string') throw new Error('Invalid from date')
+    return getDividendHistory(ticker, from)
+  })
+
+  ipcMain.handle('market:getDividendInfo', async (_event, ticker: string) => {
+    if (typeof ticker !== 'string' || ticker.length === 0) throw new Error('Invalid ticker')
+    return getDividendInfo(ticker)
   })
 }
 

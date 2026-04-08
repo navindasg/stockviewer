@@ -14,7 +14,7 @@ import {
   getTickerMetadata
 } from './db/priceCache'
 import { getTickerColor } from '../src/utils/colors'
-import type { Quote, PricePoint, SearchResult } from '../src/types/index'
+import type { Quote, PricePoint, SearchResult, DividendHistoryEntry, DividendInfo } from '../src/types/index'
 
 const STALE_THRESHOLD = 15 * 60 * 1000
 const RATE_LIMIT_DELAY = 200
@@ -274,4 +274,57 @@ export function isQuoteStale(ticker: string): boolean {
 export function getCachedQuote(ticker: string): Quote | null {
   const entry = quoteCache.get(ticker.toUpperCase())
   return entry?.quote ?? null
+}
+
+export async function getDividendHistory(
+  ticker: string,
+  from?: string
+): Promise<ReadonlyArray<DividendHistoryEntry>> {
+  const upperTicker = ticker.toUpperCase()
+  const period1 = from ?? '2000-01-01'
+
+  try {
+    const rows = await yahooFinance.historical(upperTicker, {
+      period1,
+      events: 'dividends'
+    })
+
+    return rows.map((row) => ({
+      date: formatDate(row.date),
+      amount: (row as unknown as { dividends: number }).dividends
+    }))
+  } catch (error) {
+    throw new Error(
+      `Failed to fetch dividend history for ${upperTicker}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+export async function getDividendInfo(ticker: string): Promise<DividendInfo> {
+  const upperTicker = ticker.toUpperCase()
+
+  try {
+    const summary = await yahooFinance.quoteSummary(upperTicker, {
+      modules: ['summaryDetail']
+    })
+
+    const detail = summary.summaryDetail
+    const exDateRaw = detail?.exDividendDate
+
+    return {
+      dividendRate: detail?.dividendRate ?? null,
+      dividendYield: detail?.dividendYield != null ? detail.dividendYield * 100 : null,
+      exDividendDate: exDateRaw ? formatDate(exDateRaw) : null,
+      fiveYearAvgDividendYield: detail?.fiveYearAvgDividendYield ?? null,
+      payoutRatio: detail?.payoutRatio != null ? detail.payoutRatio * 100 : null,
+      trailingAnnualDividendRate: detail?.trailingAnnualDividendRate ?? null,
+      trailingAnnualDividendYield: detail?.trailingAnnualDividendYield != null
+        ? detail.trailingAnnualDividendYield * 100
+        : null
+    }
+  } catch (error) {
+    throw new Error(
+      `Failed to fetch dividend info for ${upperTicker}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
 }

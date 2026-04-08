@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { usePortfolioStats } from '../../hooks/usePortfolioStats'
+import { useDividendStore } from '../../stores/dividendStore'
 import { computePortfolioSummary } from '../../utils/calculations'
 import type { Position, Quote } from '../../types/index'
 import {
@@ -46,17 +47,19 @@ interface PortfolioSummaryProps {
 
 export function PortfolioSummary({ filteredPositions, quotes }: PortfolioSummaryProps = {}) {
   const { summary: allSummary, isLoading } = usePortfolioStats()
+  const dividendSummary = useDividendStore((s) => s.summary)
 
   const summary = useMemo(() => {
     if (!filteredPositions || !quotes) return allSummary
     const quotesArray = Object.values(quotes)
-    return computePortfolioSummary(filteredPositions, quotesArray)
-  }, [filteredPositions, quotes, allSummary])
+    const totalDividendIncome = dividendSummary?.totalIncomeAllTime ?? 0
+    return computePortfolioSummary(filteredPositions, quotesArray, totalDividendIncome)
+  }, [filteredPositions, quotes, allSummary, dividendSummary])
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {Array.from({ length: 5 }).map((_, i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
             className="rounded-lg bg-sv-surface border border-sv-border p-4 animate-pulse h-20"
@@ -67,7 +70,7 @@ export function PortfolioSummary({ filteredPositions, quotes }: PortfolioSummary
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
       <StatCard
         label="Total Portfolio Value"
         value={formatCurrency(summary.totalValue)}
@@ -89,6 +92,11 @@ export function PortfolioSummary({ filteredPositions, quotes }: PortfolioSummary
         label="Realized Gain/Loss"
         value={formatSignedCurrency(summary.totalRealizedGain)}
         colorClass={getGainColorClass(summary.totalRealizedGain)}
+      />
+      <StatCard
+        label="Dividend Income"
+        value={formatSignedCurrency(summary.totalDividendIncome)}
+        colorClass={getGainColorClass(summary.totalDividendIncome)}
       />
       <StatCard
         label="Total Return"

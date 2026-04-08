@@ -95,7 +95,8 @@ export function computePosition(
 
 export function computePortfolioSummary(
   positions: ReadonlyArray<Position>,
-  quotes: ReadonlyArray<Quote>
+  quotes: ReadonlyArray<Quote>,
+  totalDividendIncome: number = 0
 ): PortfolioSummary {
   const quoteMap = new Map(quotes.map((q) => [q.ticker, q]))
 
@@ -132,7 +133,7 @@ export function computePortfolioSummary(
     totalValue - totalDayChange > 0
       ? (totalDayChange / (totalValue - totalDayChange)) * 100
       : 0
-  const totalReturn = totalUnrealizedGain + totalRealizedGain
+  const totalReturn = totalUnrealizedGain + totalRealizedGain + totalDividendIncome
   const totalInvestedAll = positions.reduce((sum, p) => sum + p.totalInvested, 0)
   const totalReturnPercent = totalInvestedAll > 0 ? (totalReturn / totalInvestedAll) * 100 : 0
 
@@ -144,6 +145,7 @@ export function computePortfolioSummary(
     totalUnrealizedGain,
     totalUnrealizedGainPercent,
     totalRealizedGain,
+    totalDividendIncome,
     totalReturn,
     totalReturnPercent,
     positionCount

@@ -2,10 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { useAppStore } from '../../stores/appStore'
 import { useMarketData } from '../../hooks/useMarketData'
+import { useDividends, useDividendInfo } from '../../hooks/useDividends'
 import { PriceChart } from '../Charts/PriceChart'
 import { TransactionHistory } from './TransactionHistory'
 import { TaxLotTable } from '../TaxLots/TaxLotTable'
 import { CostBasisMethodSelector } from '../TaxLots/CostBasisMethodSelector'
+import { DividendHistoryTable } from '../Dividends/DividendHistoryTable'
+import { AddDividendModal } from '../Dividends/AddDividendModal'
 import {
   formatCurrency,
   formatSignedCurrency,
@@ -172,6 +175,9 @@ function PositionDetailInner({
   const taxLotsLoading = useAppStore((s) => s.taxLotsLoading)
   const fetchTaxLots = useAppStore((s) => s.fetchTaxLots)
   const setCostBasisMethod = useAppStore((s) => s.setCostBasisMethod)
+  const { dividends, isLoading: dividendsLoading } = useDividends(ticker)
+  const dividendInfo = useDividendInfo(ticker)
+  const [dividendModalOpen, setDividendModalOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -200,6 +206,8 @@ function PositionDetailInner({
     await setCostBasisMethod(_ticker, method)
   }, [setCostBasisMethod])
 
+  const totalDividendIncome = dividends.reduce((sum, d) => sum + d.totalAmount, 0)
+
   return (
     <div className="flex flex-col h-full gap-4 p-4">
       <DetailHeader
@@ -211,7 +219,7 @@ function PositionDetailInner({
       />
 
       <div className="flex flex-1 gap-4 min-h-0">
-        <div className="w-[60%] min-h-0 flex flex-col gap-4">
+        <div className="w-[60%] min-h-0 flex flex-col gap-4 overflow-auto">
           <PriceChart
             ticker={ticker}
             transactions={[...transactions]}
@@ -219,6 +227,26 @@ function PositionDetailInner({
             color={position.color}
           />
           <TaxLotTable lots={taxLots} quote={quote} loading={taxLotsLoading} />
+
+          {(dividends.length > 0 || dividendsLoading) && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-sv-text">Dividend History</h3>
+                <button
+                  type="button"
+                  onClick={() => setDividendModalOpen(true)}
+                  className="text-xs text-sv-accent hover:text-sv-accent/80 transition-colors cursor-pointer"
+                >
+                  + Record Dividend
+                </button>
+              </div>
+              <DividendHistoryTable
+                dividends={dividends}
+                isLoading={dividendsLoading}
+                showTicker={false}
+              />
+            </div>
+          )}
         </div>
 
         <div className="w-[40%] flex flex-col gap-4 min-h-0 overflow-auto">
@@ -227,7 +255,22 @@ function PositionDetailInner({
             currentMethod={position.costBasisMethod}
             onMethodChange={handleMethodChange}
           />
-          <StatsPanel position={position} quote={quote} transactions={transactions} />
+          <StatsPanel
+            position={position}
+            quote={quote}
+            transactions={transactions}
+            totalDividendIncome={totalDividendIncome}
+            dividendInfo={dividendInfo}
+          />
+          {dividends.length === 0 && !dividendsLoading && (
+            <button
+              type="button"
+              onClick={() => setDividendModalOpen(true)}
+              className="w-full py-2 text-sm font-medium text-sv-accent border border-sv-border border-dashed rounded-md hover:bg-sv-elevated/50 transition-colors cursor-pointer"
+            >
+              + Record Dividend Payment
+            </button>
+          )}
           {txLoading ? (
             <div className="text-sv-text-muted text-sm text-center py-4">Loading transactions...</div>
           ) : (
@@ -235,6 +278,12 @@ function PositionDetailInner({
           )}
         </div>
       </div>
+
+      <AddDividendModal
+        isOpen={dividendModalOpen}
+        onClose={() => setDividendModalOpen(false)}
+        prefillTicker={ticker}
+      />
     </div>
   )
 }
@@ -282,9 +331,11 @@ interface StatsPanelProps {
   readonly position: Position
   readonly quote: Quote | null
   readonly transactions: ReadonlyArray<Transaction>
+  readonly totalDividendIncome?: number
+  readonly dividendInfo?: import('../../types/index').DividendInfo | null
 }
 
-function StatsPanel({ position, quote, transactions }: StatsPanelProps) {
+function StatsPanel({ position, quote, transactions, totalDividendIncome = 0, dividendInfo }: StatsPanelProps) {
   const currentPrice = quote?.price ?? 0
   const marketValue = currentPrice * position.totalShares
   const unrealizedGain = marketValue - position.costBasis * position.totalShares
@@ -294,7 +345,7 @@ function StatsPanel({ position, quote, transactions }: StatsPanelProps) {
       : 0
   const dayChange = (quote?.dayChange ?? 0) * position.totalShares
   const dayChangePct = quote?.dayChangePercent ?? 0
-  const totalReturn = unrealizedGain + position.totalRealized
+  const totalReturn = unrealizedGain + position.totalRealized + totalDividendIncome
   const holdingPeriod = computeHoldingPeriod(transactions)
 
   const stats: ReadonlyArray<{ readonly label: string; readonly value: string; readonly colorClass: string }> = [
@@ -307,6 +358,13 @@ function StatsPanel({ position, quote, transactions }: StatsPanelProps) {
     { label: 'Day Change', value: formatSignedCurrency(dayChange), colorClass: getValueColorClass(dayChange) },
     { label: 'Day Change %', value: formatPercent(dayChangePct), colorClass: getValueColorClass(dayChangePct) },
     { label: 'Realized G/L', value: formatSignedCurrency(position.totalRealized), colorClass: getValueColorClass(position.totalRealized) },
+    { label: 'Dividend Income', value: formatSignedCurrency(totalDividendIncome), colorClass: getValueColorClass(totalDividendIncome) },
+    ...(dividendInfo?.dividendYield != null ? [
+      { label: 'Dividend Yield', value: `${dividendInfo.dividendYield.toFixed(2)}%`, colorClass: 'text-sv-accent' as const }
+    ] : []),
+    ...(dividendInfo?.trailingAnnualDividendRate != null ? [
+      { label: 'Annual Div Rate', value: formatCurrency(dividendInfo.trailingAnnualDividendRate), colorClass: 'text-sv-text' as const }
+    ] : []),
     { label: 'Total Return', value: formatSignedCurrency(totalReturn), colorClass: getValueColorClass(totalReturn) },
     { label: 'Holding Period', value: holdingPeriod, colorClass: 'text-sv-text' }
   ]

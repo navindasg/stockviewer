@@ -24,6 +24,13 @@ export interface ElectronAPI {
   generateTaxReport: (year?: number) => Promise<unknown>
   exportTaxReportCsv: (year?: number) => Promise<string>
   addTransactionWithLots: (tx: Record<string, unknown>, lotSelections?: ReadonlyArray<{ lotId: string; shares: number }>) => Promise<unknown>
+  getDividends: (filters?: Record<string, unknown>) => Promise<unknown[]>
+  addDividend: (input: Record<string, unknown>) => Promise<unknown>
+  updateDividend: (id: string, updates: Record<string, unknown>) => Promise<unknown>
+  deleteDividend: (id: string) => Promise<void>
+  getDividendSummary: () => Promise<unknown>
+  getDividendHistory: (ticker: string, from?: string) => Promise<unknown[]>
+  getDividendInfo: (ticker: string) => Promise<unknown>
 }
 
 const api: ElectronAPI = {
@@ -50,7 +57,14 @@ const api: ElectronAPI = {
   getCostBasisMethod: (ticker) => ipcRenderer.invoke('db:getCostBasisMethod', ticker),
   generateTaxReport: (year) => ipcRenderer.invoke('db:generateTaxReport', year),
   exportTaxReportCsv: (year) => ipcRenderer.invoke('db:exportTaxReportCsv', year),
-  addTransactionWithLots: (tx, lotSelections) => ipcRenderer.invoke('db:addTransactionWithLots', tx, lotSelections)
+  addTransactionWithLots: (tx, lotSelections) => ipcRenderer.invoke('db:addTransactionWithLots', tx, lotSelections),
+  getDividends: (filters) => ipcRenderer.invoke('db:getDividends', filters),
+  addDividend: (input) => ipcRenderer.invoke('db:addDividend', input),
+  updateDividend: (id, updates) => ipcRenderer.invoke('db:updateDividend', id, updates),
+  deleteDividend: (id) => ipcRenderer.invoke('db:deleteDividend', id),
+  getDividendSummary: () => ipcRenderer.invoke('db:getDividendSummary'),
+  getDividendHistory: (ticker, from) => ipcRenderer.invoke('market:getDividendHistory', ticker, from),
+  getDividendInfo: (ticker) => ipcRenderer.invoke('market:getDividendInfo', ticker)
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api)
