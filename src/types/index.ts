@@ -11,6 +11,11 @@ export interface ElectronAPI {
   searchTicker: (query: string) => Promise<SearchResult[]>
   getPositions: () => Promise<Position[]>
   getPortfolioSummary: () => Promise<PortfolioSummary>
+  getWatchlist: () => Promise<WatchlistItem[]>
+  addWatchlistItem: (item: NewWatchlistItem) => Promise<WatchlistItem>
+  removeWatchlistItem: (id: string) => Promise<void>
+  updateWatchlistItem: (id: string, updates: { notes?: string | null }) => Promise<WatchlistItem>
+  reorderWatchlist: (orderedIds: string[]) => Promise<void>
 }
 
 export type TransactionType = 'BUY' | 'SELL'
@@ -100,6 +105,22 @@ export interface TransactionFilters {
   readonly type?: TransactionType
   readonly fromDate?: string
   readonly toDate?: string
+}
+
+export interface WatchlistItem {
+  readonly id: string
+  readonly ticker: string
+  readonly companyName: string
+  readonly notes: string | null
+  readonly sortOrder: number
+  readonly addedAt: string
+  readonly updatedAt: string
+}
+
+export interface NewWatchlistItem {
+  readonly ticker: string
+  readonly companyName: string
+  readonly notes?: string
 }
 
 declare global {

@@ -58,6 +58,20 @@ function ClosedTradesIcon() {
   )
 }
 
+function WatchlistIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M10 4C5 4 2 10 2 10C2 10 5 16 10 16C15 16 18 10 18 10C18 10 15 4 10 4Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <circle cx="10" cy="10" r="3" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  )
+}
+
 function CollapseIcon({ collapsed }: { readonly collapsed: boolean }) {
   return (
     <svg
@@ -84,7 +98,8 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { id: 'position-detail', label: 'Positions', icon: <PositionsIcon /> },
   { id: 'compare', label: 'Compare', icon: <CompareIcon /> },
   { id: 'transactions', label: 'Transactions', icon: <TransactionsIcon /> },
-  { id: 'closed-positions', label: 'Closed Trades', icon: <ClosedTradesIcon /> }
+  { id: 'closed-positions', label: 'Closed Trades', icon: <ClosedTradesIcon /> },
+  { id: 'watchlist', label: 'Watchlist', icon: <WatchlistIcon /> }
 ]
 
 export function Sidebar() {

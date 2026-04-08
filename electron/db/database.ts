@@ -46,6 +46,19 @@ function runMigrations(database: Database.Database): void {
       color TEXT,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS watchlist (
+      id TEXT PRIMARY KEY,
+      ticker TEXT NOT NULL UNIQUE,
+      company_name TEXT NOT NULL,
+      notes TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_watchlist_ticker ON watchlist(ticker);
+    CREATE INDEX IF NOT EXISTS idx_watchlist_sort_order ON watchlist(sort_order);
   `)
 }
 
