@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { Position, Quote, NewTransaction, TaxLot, CostBasisMethod, TaxReportSummary } from '../types/index'
 
-export type ViewName = 'dashboard' | 'position-detail' | 'compare' | 'transactions' | 'closed-positions' | 'watchlist' | 'dividends'
+export type ViewName = 'dashboard' | 'position-detail' | 'compare' | 'transactions' | 'closed-positions' | 'watchlist' | 'dividends' | 'options'
 export type GainStatus = 'all' | 'winners' | 'losers'
 
 export interface FilterState {

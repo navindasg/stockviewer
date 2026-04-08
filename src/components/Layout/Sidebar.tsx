@@ -102,9 +102,20 @@ function DividendsIcon() {
   )
 }
 
+function OptionsIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 10h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M10 3v14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  )
+}
+
 const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
   { id: 'position-detail', label: 'Positions', icon: <PositionsIcon /> },
+  { id: 'options', label: 'Options', icon: <OptionsIcon /> },
   { id: 'compare', label: 'Compare', icon: <CompareIcon /> },
   { id: 'transactions', label: 'Transactions', icon: <TransactionsIcon /> },
   { id: 'dividends', label: 'Dividends', icon: <DividendsIcon /> },

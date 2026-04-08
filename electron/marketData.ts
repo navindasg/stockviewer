@@ -14,7 +14,7 @@ import {
   getTickerMetadata
 } from './db/priceCache'
 import { getTickerColor } from '../src/utils/colors'
-import type { Quote, PricePoint, SearchResult, DividendHistoryEntry, DividendInfo } from '../src/types/index'
+import type { Quote, PricePoint, SearchResult, DividendHistoryEntry, DividendInfo, OptionsChainData, OptionsChainContract, OptionsChainExpiration } from '../src/types/index'
 
 const STALE_THRESHOLD = 15 * 60 * 1000
 const RATE_LIMIT_DELAY = 200
@@ -297,6 +297,79 @@ export async function getDividendHistory(
     throw new Error(
       `Failed to fetch dividend history for ${upperTicker}: ${error instanceof Error ? error.message : String(error)}`
     )
+  }
+}
+
+export async function getOptionsChain(
+  ticker: string,
+  expirationDate?: string
+): Promise<OptionsChainData> {
+  const upperTicker = ticker.toUpperCase()
+
+  try {
+    const options: Record<string, unknown> = {}
+    if (expirationDate) {
+      options.date = new Date(expirationDate)
+    }
+
+    const result = await yahooFinance.options(upperTicker, options) as Record<string, unknown>
+
+    const quote = result.quote as Record<string, unknown> | undefined
+    const underlyingPrice = (quote?.regularMarketPrice as number) ?? 0
+
+    const expirationDates = (result.expirationDates as Date[] | undefined) ?? []
+    const expirations = expirationDates.map((d: Date) => formatDate(d))
+
+    let selectedExpiration: OptionsChainExpiration | null = null
+    const rawOptions = result.options as ReadonlyArray<Record<string, unknown>> | undefined
+
+    if (rawOptions && rawOptions.length > 0) {
+      const chain = rawOptions[0]
+      const rawCalls = (chain.calls as ReadonlyArray<Record<string, unknown>>) ?? []
+      const rawPuts = (chain.puts as ReadonlyArray<Record<string, unknown>>) ?? []
+
+      const calls: ReadonlyArray<OptionsChainContract> = rawCalls.map(mapChainContract)
+      const puts: ReadonlyArray<OptionsChainContract> = rawPuts.map(mapChainContract)
+
+      const expDate = chain.expirationDate as Date | undefined
+      selectedExpiration = {
+        date: expDate ? formatDate(expDate) : expirations[0] ?? '',
+        calls,
+        puts
+      }
+    }
+
+    return {
+      underlyingTicker: upperTicker,
+      underlyingPrice,
+      expirations,
+      selectedExpiration
+    }
+  } catch (error) {
+    throw new Error(
+      `Failed to fetch options chain for ${upperTicker}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+}
+
+function mapChainContract(raw: Record<string, unknown>): OptionsChainContract {
+  const lastTrade = raw.lastTradeDate as Date | undefined
+  return {
+    contractSymbol: (raw.contractSymbol as string) ?? '',
+    strike: (raw.strike as number) ?? 0,
+    lastPrice: (raw.lastPrice as number) ?? 0,
+    bid: (raw.bid as number) ?? 0,
+    ask: (raw.ask as number) ?? 0,
+    volume: (raw.volume as number) ?? 0,
+    openInterest: (raw.openInterest as number) ?? 0,
+    impliedVolatility: (raw.impliedVolatility as number) ?? 0,
+    inTheMoney: (raw.inTheMoney as boolean) ?? false,
+    lastTradeDate: lastTrade ? formatDate(lastTrade) : null,
+    percentChange: (raw.percentChange as number) ?? 0,
+    delta: null,
+    gamma: null,
+    theta: null,
+    vega: null
   }
 }
 

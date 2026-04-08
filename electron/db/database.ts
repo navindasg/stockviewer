@@ -114,11 +114,19 @@ function runMigrations(database: Database.Database): void {
   `)
 
   addColumnIfNotExists(database, 'ticker_metadata', 'cost_basis_method', "TEXT NOT NULL DEFAULT 'AVGCOST'")
+
+  // Options trading columns on transactions table
+  addColumnIfNotExists(database, 'transactions', 'asset_type', "TEXT NOT NULL DEFAULT 'EQUITY'")
+  addColumnIfNotExists(database, 'transactions', 'option_type', 'TEXT')
+  addColumnIfNotExists(database, 'transactions', 'strike_price', 'REAL')
+  addColumnIfNotExists(database, 'transactions', 'expiration_date', 'TEXT')
+  addColumnIfNotExists(database, 'transactions', 'contract_multiplier', 'INTEGER')
+  addColumnIfNotExists(database, 'transactions', 'option_action', 'TEXT')
 }
 
 const ALLOWED_TABLES = new Set(['ticker_metadata', 'transactions', 'tax_lots', 'lot_assignments', 'price_cache', 'watchlist', 'dividends'])
 const IDENTIFIER_PATTERN = /^[a-z_]+$/
-const DEFINITION_PATTERN = /^[A-Z ]+(?:\([^)]+\))?(?:\s+(?:NOT NULL|DEFAULT '[^']*'))*$/
+const DEFINITION_PATTERN = /^[A-Z ]+(?:\([^)]+\))?(?:\s+(?:NOT NULL|DEFAULT '[^']*'|DEFAULT \d+))*$/
 
 function addColumnIfNotExists(database: Database.Database, table: string, column: string, definition: string): void {
   if (!ALLOWED_TABLES.has(table)) {
