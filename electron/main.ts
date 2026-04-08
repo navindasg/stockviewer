@@ -36,6 +36,11 @@ import {
   getOptionTransactions,
   getOptionPositions
 } from './db/options'
+import {
+  computePortfolioTWR,
+  computeBenchmarkTWR,
+  computeBenchmarkStats
+} from './db/benchmarks'
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -340,6 +345,46 @@ function registerIpcHandlers(): void {
   ipcMain.handle('market:getDividendInfo', async (_event, ticker: string) => {
     if (typeof ticker !== 'string' || ticker.length === 0) throw new Error('Invalid ticker')
     return getDividendInfo(ticker)
+  })
+
+  // Benchmarking IPC Handlers
+  const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
+  function validateDateRange(from: unknown, to: unknown): asserts from is string {
+    if (typeof from !== 'string' || !DATE_REGEX.test(from)) throw new Error('Invalid from date')
+    if (typeof to !== 'string' || !DATE_REGEX.test(to)) throw new Error('Invalid to date')
+  }
+
+  function validateBenchmarkTicker(ticker: unknown): asserts ticker is string {
+    if (typeof ticker !== 'string' || ticker.length === 0 || ticker.length > 10) throw new Error('Invalid ticker')
+  }
+
+  ipcMain.handle('db:getPortfolioTWR', async (_event, from: unknown, to: unknown) => {
+    validateDateRange(from, to)
+    return computePortfolioTWR(from, to as string)
+  })
+
+  ipcMain.handle('db:getBenchmarkTWR', async (_event, ticker: unknown, from: unknown, to: unknown) => {
+    validateBenchmarkTicker(ticker)
+    validateDateRange(from, to)
+    return computeBenchmarkTWR(ticker, from, to as string)
+  })
+
+  ipcMain.handle('db:getBenchmarkStats', async (_event, benchmarkTicker: unknown, from: unknown, to: unknown) => {
+    validateBenchmarkTicker(benchmarkTicker)
+    validateDateRange(from, to)
+    const portfolioTWR = computePortfolioTWR(from, to as string)
+    const benchmarkTWR = computeBenchmarkTWR(benchmarkTicker, from, to as string)
+    return computeBenchmarkStats(portfolioTWR, benchmarkTWR, from, to as string)
+  })
+
+  ipcMain.handle('db:getBenchmarkData', async (_event, benchmarkTicker: unknown, from: unknown, to: unknown) => {
+    validateBenchmarkTicker(benchmarkTicker)
+    validateDateRange(from, to)
+    const portfolioTWR = computePortfolioTWR(from, to as string)
+    const benchmarkTWR = computeBenchmarkTWR(benchmarkTicker, from, to as string)
+    const stats = computeBenchmarkStats(portfolioTWR, benchmarkTWR, from, to as string)
+    return { portfolioTWR, benchmarkTWR, stats }
   })
 
   // Options Trading IPC Handlers

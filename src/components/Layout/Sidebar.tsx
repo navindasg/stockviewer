@@ -112,11 +112,22 @@ function OptionsIcon() {
   )
 }
 
+function BenchmarkIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 16L7 9L11 12L18 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2 16L6 13L10 15L18 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.4" />
+      <circle cx="18" cy="4" r="1.5" fill="currentColor" />
+    </svg>
+  )
+}
+
 const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
   { id: 'position-detail', label: 'Positions', icon: <PositionsIcon /> },
   { id: 'options', label: 'Options', icon: <OptionsIcon /> },
   { id: 'compare', label: 'Compare', icon: <CompareIcon /> },
+  { id: 'benchmark', label: 'Benchmark', icon: <BenchmarkIcon /> },
   { id: 'transactions', label: 'Transactions', icon: <TransactionsIcon /> },
   { id: 'dividends', label: 'Dividends', icon: <DividendsIcon /> },
   { id: 'closed-positions', label: 'Closed Trades', icon: <ClosedTradesIcon /> },
