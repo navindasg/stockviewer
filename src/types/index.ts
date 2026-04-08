@@ -99,6 +99,11 @@ export interface ElectronAPI {
   getDividendSummary: () => Promise<PortfolioDividendSummary>
   getDividendHistory: (ticker: string, from?: string) => Promise<DividendHistoryEntry[]>
   getDividendInfo: (ticker: string) => Promise<DividendInfo>
+  // Benchmarking
+  getPortfolioTWR: (from: string, to: string) => Promise<TWRDataPoint[]>
+  getBenchmarkTWR: (ticker: string, from: string, to: string) => Promise<TWRDataPoint[]>
+  getBenchmarkStats: (benchmarkTicker: string, from: string, to: string) => Promise<BenchmarkStats>
+  getBenchmarkData: (benchmarkTicker: string, from: string, to: string) => Promise<BenchmarkData>
   // Options
   addOptionTransaction: (tx: NewOptionTransaction) => Promise<OptionTransaction>
   deleteOptionTransaction: (id: string) => Promise<void>
@@ -283,6 +288,32 @@ export interface DividendFilters {
   readonly fromDate?: string
   readonly toDate?: string
   readonly type?: DividendType
+}
+
+// Benchmarking types
+
+export type BenchmarkTimeRange = '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL'
+
+export interface TWRDataPoint {
+  readonly date: string
+  readonly cumulativeReturn: number
+}
+
+export interface BenchmarkStats {
+  readonly portfolioReturn: number
+  readonly benchmarkReturn: number
+  readonly alpha: number
+  readonly portfolioMaxDrawdown: number
+  readonly benchmarkMaxDrawdown: number
+  readonly trackingDifference: number
+  readonly portfolioAnnualizedReturn: number
+  readonly benchmarkAnnualizedReturn: number
+}
+
+export interface BenchmarkData {
+  readonly portfolioTWR: ReadonlyArray<TWRDataPoint>
+  readonly benchmarkTWR: ReadonlyArray<TWRDataPoint>
+  readonly stats: BenchmarkStats
 }
 
 declare global {
