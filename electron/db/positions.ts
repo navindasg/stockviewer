@@ -122,7 +122,7 @@ export function deleteTransaction(id: string): void {
 
 export function getTransactions(filters?: TransactionFilters): ReadonlyArray<Transaction> {
   const db = getDatabase()
-  const conditions: string[] = []
+  const conditions: string[] = ["asset_type = 'EQUITY'"]
   const params: unknown[] = []
 
   if (filters?.ticker) {
@@ -150,7 +150,7 @@ export function getTransactions(filters?: TransactionFilters): ReadonlyArray<Tra
 
 export function getPositions(): ReadonlyArray<Position> {
   const db = getDatabase()
-  const tickers = db.prepare('SELECT DISTINCT ticker FROM transactions ORDER BY ticker').all() as Array<{ ticker: string }>
+  const tickers = db.prepare("SELECT DISTINCT ticker FROM transactions WHERE asset_type = 'EQUITY' ORDER BY ticker").all() as Array<{ ticker: string }>
 
   return tickers.map((row) => computePosition(row.ticker))
 }
@@ -158,7 +158,7 @@ export function getPositions(): ReadonlyArray<Position> {
 function computePosition(ticker: string): Position {
   const db = getDatabase()
   const transactions = db.prepare(
-    'SELECT * FROM transactions WHERE ticker = ? ORDER BY date ASC, created_at ASC'
+    "SELECT * FROM transactions WHERE ticker = ? AND asset_type = 'EQUITY' ORDER BY date ASC, created_at ASC"
   ).all(ticker) as Transaction[]
 
   let firstBuyDate: string | null = null
@@ -239,7 +239,7 @@ function validateSell(ticker: string, sharesToSell: number, sellDate: string, ex
 
   let query = `
     SELECT type, shares FROM transactions
-    WHERE ticker = ? AND date <= ?
+    WHERE ticker = ? AND date <= ? AND asset_type = 'EQUITY'
   `
   const params: unknown[] = [ticker.toUpperCase(), sellDate]
 

@@ -31,6 +31,11 @@ export interface ElectronAPI {
   getDividendSummary: () => Promise<unknown>
   getDividendHistory: (ticker: string, from?: string) => Promise<unknown[]>
   getDividendInfo: (ticker: string) => Promise<unknown>
+  addOptionTransaction: (tx: Record<string, unknown>) => Promise<unknown>
+  deleteOptionTransaction: (id: string) => Promise<void>
+  getOptionTransactions: (filters?: Record<string, unknown>) => Promise<unknown[]>
+  getOptionPositions: (filters?: Record<string, unknown>) => Promise<unknown[]>
+  getOptionsChain: (ticker: string, expirationDate?: string) => Promise<unknown>
 }
 
 const api: ElectronAPI = {
@@ -64,7 +69,12 @@ const api: ElectronAPI = {
   deleteDividend: (id) => ipcRenderer.invoke('db:deleteDividend', id),
   getDividendSummary: () => ipcRenderer.invoke('db:getDividendSummary'),
   getDividendHistory: (ticker, from) => ipcRenderer.invoke('market:getDividendHistory', ticker, from),
-  getDividendInfo: (ticker) => ipcRenderer.invoke('market:getDividendInfo', ticker)
+  getDividendInfo: (ticker) => ipcRenderer.invoke('market:getDividendInfo', ticker),
+  addOptionTransaction: (tx) => ipcRenderer.invoke('db:addOptionTransaction', tx),
+  deleteOptionTransaction: (id) => ipcRenderer.invoke('db:deleteOptionTransaction', id),
+  getOptionTransactions: (filters) => ipcRenderer.invoke('db:getOptionTransactions', filters),
+  getOptionPositions: (filters) => ipcRenderer.invoke('db:getOptionPositions', filters),
+  getOptionsChain: (ticker, expirationDate) => ipcRenderer.invoke('market:getOptionsChain', ticker, expirationDate)
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api)

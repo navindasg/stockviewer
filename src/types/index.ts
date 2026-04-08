@@ -1,5 +1,21 @@
 // TypeScript interfaces
 
+export type {
+  AssetType,
+  OptionType,
+  OptionAction,
+  OptionPositionStatus,
+  OptionTransaction,
+  NewOptionTransaction,
+  OptionPosition,
+  OptionPositionFilters,
+  OptionsChainContract,
+  OptionsChainExpiration,
+  OptionsChainData,
+  PositionGreeks,
+  PortfolioGreeks
+} from './options'
+
 export type CostBasisMethod = 'FIFO' | 'LIFO' | 'AVGCOST' | 'SPECIFIC'
 
 export interface TaxLot {
@@ -83,6 +99,12 @@ export interface ElectronAPI {
   getDividendSummary: () => Promise<PortfolioDividendSummary>
   getDividendHistory: (ticker: string, from?: string) => Promise<DividendHistoryEntry[]>
   getDividendInfo: (ticker: string) => Promise<DividendInfo>
+  // Options
+  addOptionTransaction: (tx: NewOptionTransaction) => Promise<OptionTransaction>
+  deleteOptionTransaction: (id: string) => Promise<void>
+  getOptionTransactions: (filters?: OptionPositionFilters) => Promise<OptionTransaction[]>
+  getOptionPositions: (filters?: OptionPositionFilters) => Promise<OptionPosition[]>
+  getOptionsChain: (ticker: string, expirationDate?: string) => Promise<OptionsChainData>
 }
 
 export type TransactionType = 'BUY' | 'SELL'

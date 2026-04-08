@@ -11,6 +11,7 @@ import { TransactionsView } from '../Views/TransactionsView'
 import { ClosedPositionsView } from '../Views/ClosedPositionsView'
 import { WatchlistView } from '../Watchlist/WatchlistView'
 import { DividendsView } from '../Views/DividendsView'
+import { OptionsView } from '../Views/OptionsView'
 
 function renderView(activeView: ViewName) {
   switch (activeView) {
@@ -28,6 +29,8 @@ function renderView(activeView: ViewName) {
       return <WatchlistView />
     case 'dividends':
       return <DividendsView />
+    case 'options':
+      return <OptionsView />
     default:
       return <DashboardView />
   }

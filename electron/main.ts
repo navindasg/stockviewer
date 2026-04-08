@@ -27,8 +27,15 @@ import {
   deleteDividend,
   getDividendSummary
 } from './db/dividends'
-import type { NewTransaction, TransactionFilters, CostBasisMethod, NewDividend, DividendFilters } from '../src/types/index'
-import { getQuote, getQuotes, getHistoricalPrices, searchTicker, isQuoteStale, getCachedQuote, getDividendHistory, getDividendInfo } from './marketData'
+import type { NewTransaction, TransactionFilters, CostBasisMethod, NewDividend, DividendFilters, OptionPositionFilters } from '../src/types/index'
+import type { OptionAction, OptionType, NewOptionTransaction } from '../src/types/options'
+import { getQuote, getQuotes, getHistoricalPrices, searchTicker, isQuoteStale, getCachedQuote, getDividendHistory, getDividendInfo, getOptionsChain } from './marketData'
+import {
+  addOptionTransaction,
+  deleteOptionTransaction,
+  getOptionTransactions,
+  getOptionPositions
+} from './db/options'
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -334,6 +341,65 @@ function registerIpcHandlers(): void {
     if (typeof ticker !== 'string' || ticker.length === 0) throw new Error('Invalid ticker')
     return getDividendInfo(ticker)
   })
+
+  // Options Trading IPC Handlers
+  ipcMain.handle('db:addOptionTransaction', (_event, tx: unknown) => {
+    validateOptionTransactionInput(tx)
+    return addOptionTransaction(tx as NewOptionTransaction)
+  })
+
+  ipcMain.handle('db:deleteOptionTransaction', (_event, id: unknown) => {
+    if (typeof id !== 'string' || id.length === 0) throw new Error('Invalid id')
+    deleteOptionTransaction(id)
+  })
+
+  ipcMain.handle('db:getOptionTransactions', (_event, filters?: unknown) => {
+    if (filters !== undefined) {
+      if (typeof filters !== 'object' || filters === null) throw new Error('Invalid filters')
+      const f = filters as Record<string, unknown>
+      if (f.ticker !== undefined && (typeof f.ticker !== 'string' || f.ticker.length === 0)) throw new Error('Invalid ticker filter')
+      if (f.optionType !== undefined && f.optionType !== 'CALL' && f.optionType !== 'PUT') throw new Error('Invalid option type filter')
+      if (f.status !== undefined && f.status !== 'OPEN' && f.status !== 'CLOSED' && f.status !== 'EXPIRED') throw new Error('Invalid status filter')
+    }
+    return getOptionTransactions(filters as OptionPositionFilters | undefined)
+  })
+
+  ipcMain.handle('db:getOptionPositions', (_event, filters?: unknown) => {
+    if (filters !== undefined) {
+      if (typeof filters !== 'object' || filters === null) throw new Error('Invalid filters')
+      const f = filters as Record<string, unknown>
+      if (f.ticker !== undefined && (typeof f.ticker !== 'string' || f.ticker.length === 0)) throw new Error('Invalid ticker filter')
+      if (f.optionType !== undefined && f.optionType !== 'CALL' && f.optionType !== 'PUT') throw new Error('Invalid option type filter')
+      if (f.status !== undefined && f.status !== 'OPEN' && f.status !== 'CLOSED' && f.status !== 'EXPIRED') throw new Error('Invalid status filter')
+    }
+    return getOptionPositions(filters as OptionPositionFilters | undefined)
+  })
+
+  ipcMain.handle('market:getOptionsChain', async (_event, ticker: string, expirationDate?: string) => {
+    if (typeof ticker !== 'string' || ticker.length === 0) throw new Error('Invalid ticker')
+    if (expirationDate !== undefined && typeof expirationDate !== 'string') throw new Error('Invalid expiration date')
+    return getOptionsChain(ticker, expirationDate)
+  })
+}
+
+const VALID_OPTION_ACTIONS = new Set<string>([
+  'BUY_TO_OPEN', 'SELL_TO_CLOSE', 'SELL_TO_OPEN', 'BUY_TO_CLOSE', 'EXERCISE', 'ASSIGNMENT', 'EXPIRE'
+])
+
+function validateOptionTransactionInput(tx: unknown): void {
+  if (!tx || typeof tx !== 'object') throw new Error('Invalid input')
+  const {
+    ticker, optionAction, optionType, strikePrice, expirationDate, contracts, price, date
+  } = tx as Record<string, unknown>
+
+  if (typeof ticker !== 'string' || ticker.length === 0 || ticker.length > 10) throw new Error('Invalid ticker')
+  if (typeof optionAction !== 'string' || !VALID_OPTION_ACTIONS.has(optionAction)) throw new Error('Invalid option action')
+  if (optionType !== 'CALL' && optionType !== 'PUT') throw new Error('Invalid option type')
+  if (typeof strikePrice !== 'number' || strikePrice <= 0) throw new Error('Invalid strike price')
+  if (typeof expirationDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(expirationDate)) throw new Error('Invalid expiration date format')
+  if (typeof contracts !== 'number' || contracts <= 0 || !Number.isInteger(contracts)) throw new Error('Invalid contracts count')
+  if (typeof price !== 'number' || price < 0) throw new Error('Invalid price')
+  if (typeof date !== 'string' || date.length === 0) throw new Error('Invalid date')
 }
 
 app.whenReady().then(() => {

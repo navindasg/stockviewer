@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { useAppStore } from '../../stores/appStore'
+import { useOptionsStore } from '../../stores/optionsStore'
 import { usePositions } from '../../hooks/usePositions'
 import { PortfolioSummary } from '../Portfolio/PortfolioSummary'
 import { AllocationChart } from '../Portfolio/AllocationChart'
@@ -34,7 +36,15 @@ function EmptyState() {
 export function DashboardView() {
   const { positions, filteredPositions, isLoading } = usePositions()
   const quotes = useAppStore((s) => s.quotes)
+  const setActiveView = useAppStore((s) => s.setActiveView)
+  const fetchOptionPositions = useOptionsStore((s) => s.fetchOptionPositions)
+  const optionPositions = useOptionsStore((s) => s.optionPositions)
 
+  useEffect(() => {
+    fetchOptionPositions().catch(() => {})
+  }, [fetchOptionPositions])
+
+  const openOptions = optionPositions.filter((p) => p.status === 'OPEN')
   const hasPositions = positions.length > 0
 
   if (!hasPositions && !isLoading) {
@@ -57,6 +67,48 @@ export function DashboardView() {
       </div>
 
       <PositionList positions={filteredPositions} quotes={quotes} />
+
+      {/* Options Summary */}
+      {openOptions.length > 0 && (
+        <div className="bg-sv-surface rounded-lg border border-sv-border p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-sv-text">Open Options</h3>
+            <button
+              type="button"
+              onClick={() => setActiveView('options')}
+              className="text-xs text-sv-accent hover:underline cursor-pointer"
+            >
+              View All
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <p className="text-xs text-sv-text-muted">Contracts</p>
+              <p className="text-sm font-mono tabular-nums text-sv-text font-medium">
+                {openOptions.reduce((sum, p) => sum + p.openContracts, 0)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-sv-text-muted">Positions</p>
+              <p className="text-sm font-mono tabular-nums text-sv-text font-medium">
+                {openOptions.length}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-sv-text-muted">Total Premium Paid</p>
+              <p className="text-sm font-mono tabular-nums text-sv-text font-medium">
+                ${openOptions.reduce((sum, p) => sum + p.totalPremiumPaid, 0).toFixed(2)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-sv-text-muted">Total Premium Received</p>
+              <p className="text-sm font-mono tabular-nums text-sv-text font-medium">
+                ${openOptions.reduce((sum, p) => sum + p.totalPremiumReceived, 0).toFixed(2)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
