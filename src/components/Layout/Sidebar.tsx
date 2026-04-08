@@ -93,11 +93,21 @@ function CollapseIcon({ collapsed }: { readonly collapsed: boolean }) {
   )
 }
 
+function DividendsIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="10" y1="2" x2="10" y2="18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M14 6H8.5a2.5 2.5 0 000 5h3a2.5 2.5 0 010 5H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
   { id: 'position-detail', label: 'Positions', icon: <PositionsIcon /> },
   { id: 'compare', label: 'Compare', icon: <CompareIcon /> },
   { id: 'transactions', label: 'Transactions', icon: <TransactionsIcon /> },
+  { id: 'dividends', label: 'Dividends', icon: <DividendsIcon /> },
   { id: 'closed-positions', label: 'Closed Trades', icon: <ClosedTradesIcon /> },
   { id: 'watchlist', label: 'Watchlist', icon: <WatchlistIcon /> }
 ]

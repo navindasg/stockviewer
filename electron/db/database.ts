@@ -91,13 +91,34 @@ function runMigrations(database: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_lot_assignments_sell_tx ON lot_assignments(sell_transaction_id);
     CREATE INDEX IF NOT EXISTS idx_lot_assignments_lot ON lot_assignments(tax_lot_id);
+
+    CREATE TABLE IF NOT EXISTS dividends (
+      id TEXT PRIMARY KEY,
+      ticker TEXT NOT NULL,
+      ex_date TEXT NOT NULL,
+      pay_date TEXT NOT NULL,
+      amount_per_share REAL NOT NULL CHECK(amount_per_share > 0),
+      total_amount REAL NOT NULL CHECK(total_amount > 0),
+      shares_at_date REAL NOT NULL CHECK(shares_at_date > 0),
+      type TEXT NOT NULL CHECK(type IN ('CASH', 'REINVESTED')),
+      linked_transaction_id TEXT REFERENCES transactions(id) ON DELETE SET NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_dividends_ticker ON dividends(ticker);
+    CREATE INDEX IF NOT EXISTS idx_dividends_ex_date ON dividends(ex_date);
+    CREATE INDEX IF NOT EXISTS idx_dividends_pay_date ON dividends(pay_date);
+    CREATE INDEX IF NOT EXISTS idx_dividends_type ON dividends(type);
   `)
 
   addColumnIfNotExists(database, 'ticker_metadata', 'cost_basis_method', "TEXT NOT NULL DEFAULT 'AVGCOST'")
 }
 
-const ALLOWED_TABLES = new Set(['ticker_metadata', 'transactions', 'tax_lots', 'lot_assignments', 'price_cache', 'watchlist'])
+const ALLOWED_TABLES = new Set(['ticker_metadata', 'transactions', 'tax_lots', 'lot_assignments', 'price_cache', 'watchlist', 'dividends'])
 const IDENTIFIER_PATTERN = /^[a-z_]+$/
+const DEFINITION_PATTERN = /^[A-Z ]+(?:\([^)]+\))?(?:\s+(?:NOT NULL|DEFAULT '[^']*'))*$/
 
 function addColumnIfNotExists(database: Database.Database, table: string, column: string, definition: string): void {
   if (!ALLOWED_TABLES.has(table)) {
@@ -105,6 +126,9 @@ function addColumnIfNotExists(database: Database.Database, table: string, column
   }
   if (!IDENTIFIER_PATTERN.test(column)) {
     throw new Error(`Invalid column name: ${column}`)
+  }
+  if (!DEFINITION_PATTERN.test(definition)) {
+    throw new Error(`Invalid column definition: ${definition}`)
   }
 
   const columns = database.prepare(`PRAGMA table_info(${table})`).all() as ReadonlyArray<{ name: string }>

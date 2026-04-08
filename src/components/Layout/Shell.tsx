@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { useAppStore, type ViewName } from '../../stores/appStore'
+import { useDividendStore } from '../../stores/dividendStore'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { AddTransactionModal } from '../Forms/AddTransactionModal'
@@ -9,6 +10,7 @@ import { CompareView } from '../Views/CompareView'
 import { TransactionsView } from '../Views/TransactionsView'
 import { ClosedPositionsView } from '../Views/ClosedPositionsView'
 import { WatchlistView } from '../Watchlist/WatchlistView'
+import { DividendsView } from '../Views/DividendsView'
 
 function renderView(activeView: ViewName) {
   switch (activeView) {
@@ -24,6 +26,8 @@ function renderView(activeView: ViewName) {
       return <ClosedPositionsView />
     case 'watchlist':
       return <WatchlistView />
+    case 'dividends':
+      return <DividendsView />
     default:
       return <DashboardView />
   }
@@ -37,6 +41,7 @@ export function Shell() {
   const modalOpen = useAppStore((state) => state.modalOpen)
   const setModalOpen = useAppStore((state) => state.setModalOpen)
   const selectedTicker = useAppStore((state) => state.selectedTicker)
+  const fetchDividendSummary = useDividendStore((state) => state.fetchDividendSummary)
 
   const handleCloseModal = useCallback(() => {
     setModalOpen(false)
@@ -82,9 +87,14 @@ export function Shell() {
       } catch {
         // Store actions throw with details; positions will remain empty
       }
+      try {
+        await fetchDividendSummary()
+      } catch {
+        // Dividend summary is best-effort
+      }
     }
     loadInitialData()
-  }, [fetchPositions])
+  }, [fetchPositions, fetchDividendSummary])
 
   useEffect(() => {
     const tickers = positions.map((p) => p.ticker)

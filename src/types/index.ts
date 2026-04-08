@@ -76,9 +76,78 @@ export interface ElectronAPI {
   generateTaxReport: (year?: number) => Promise<TaxReportSummary>
   exportTaxReportCsv: (year?: number) => Promise<string>
   addTransactionWithLots: (tx: NewTransaction, lotSelections?: ReadonlyArray<{ lotId: string; shares: number }>) => Promise<Transaction>
+  getDividends: (filters?: DividendFilters) => Promise<Dividend[]>
+  addDividend: (dividend: NewDividend) => Promise<Dividend>
+  updateDividend: (id: string, updates: Partial<NewDividend>) => Promise<Dividend>
+  deleteDividend: (id: string) => Promise<void>
+  getDividendSummary: () => Promise<PortfolioDividendSummary>
+  getDividendHistory: (ticker: string, from?: string) => Promise<DividendHistoryEntry[]>
+  getDividendInfo: (ticker: string) => Promise<DividendInfo>
 }
 
 export type TransactionType = 'BUY' | 'SELL'
+export type DividendType = 'CASH' | 'REINVESTED'
+
+export interface Dividend {
+  readonly id: string
+  readonly ticker: string
+  readonly exDate: string
+  readonly payDate: string
+  readonly amountPerShare: number
+  readonly totalAmount: number
+  readonly sharesAtDate: number
+  readonly type: DividendType
+  readonly linkedTransactionId: string | null
+  readonly notes: string | null
+  readonly createdAt: string
+  readonly updatedAt: string
+}
+
+export interface NewDividend {
+  readonly ticker: string
+  readonly exDate: string
+  readonly payDate: string
+  readonly amountPerShare: number
+  readonly sharesAtDate: number
+  readonly type: DividendType
+  readonly notes?: string
+}
+
+export interface DividendSummary {
+  readonly ticker: string
+  readonly companyName: string
+  readonly totalIncome: number
+  readonly ytdIncome: number
+  readonly trailing12mIncome: number
+  readonly paymentCount: number
+  readonly lastPayDate: string | null
+  readonly annualizedIncome: number
+  readonly dividendYield: number
+}
+
+export interface PortfolioDividendSummary {
+  readonly totalIncomeAllTime: number
+  readonly totalIncomeYtd: number
+  readonly totalIncomeTrailing12m: number
+  readonly totalAnnualizedIncome: number
+  readonly averageYield: number
+  readonly perTicker: ReadonlyArray<DividendSummary>
+}
+
+export interface DividendInfo {
+  readonly dividendRate: number | null
+  readonly dividendYield: number | null
+  readonly exDividendDate: string | null
+  readonly fiveYearAvgDividendYield: number | null
+  readonly payoutRatio: number | null
+  readonly trailingAnnualDividendRate: number | null
+  readonly trailingAnnualDividendYield: number | null
+}
+
+export interface DividendHistoryEntry {
+  readonly date: string
+  readonly amount: number
+}
 
 export interface Transaction {
   readonly id: string
@@ -158,6 +227,7 @@ export interface PortfolioSummary {
   readonly totalUnrealizedGain: number
   readonly totalUnrealizedGainPercent: number
   readonly totalRealizedGain: number
+  readonly totalDividendIncome: number
   readonly totalReturn: number
   readonly totalReturnPercent: number
   readonly positionCount: number
@@ -184,6 +254,13 @@ export interface NewWatchlistItem {
   readonly ticker: string
   readonly companyName: string
   readonly notes?: string
+}
+
+export interface DividendFilters {
+  readonly ticker?: string
+  readonly fromDate?: string
+  readonly toDate?: string
+  readonly type?: DividendType
 }
 
 declare global {
