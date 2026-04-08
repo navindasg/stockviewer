@@ -11,6 +11,11 @@ export interface ElectronAPI {
   searchTicker: (query: string) => Promise<unknown[]>
   getPositions: () => Promise<unknown[]>
   getPortfolioSummary: () => Promise<unknown>
+  getWatchlist: () => Promise<unknown[]>
+  addWatchlistItem: (item: Record<string, unknown>) => Promise<unknown>
+  removeWatchlistItem: (id: string) => Promise<void>
+  updateWatchlistItem: (id: string, updates: Record<string, unknown>) => Promise<unknown>
+  reorderWatchlist: (orderedIds: string[]) => Promise<void>
 }
 
 const api: ElectronAPI = {
@@ -24,7 +29,12 @@ const api: ElectronAPI = {
     ipcRenderer.invoke('market:getHistoricalPrices', ticker, from, to),
   searchTicker: (query) => ipcRenderer.invoke('market:searchTicker', query),
   getPositions: () => ipcRenderer.invoke('db:getPositions'),
-  getPortfolioSummary: () => ipcRenderer.invoke('db:getPortfolioSummary')
+  getPortfolioSummary: () => ipcRenderer.invoke('db:getPortfolioSummary'),
+  getWatchlist: () => ipcRenderer.invoke('db:getWatchlist'),
+  addWatchlistItem: (item) => ipcRenderer.invoke('db:addWatchlistItem', item),
+  removeWatchlistItem: (id) => ipcRenderer.invoke('db:removeWatchlistItem', id),
+  updateWatchlistItem: (id, updates) => ipcRenderer.invoke('db:updateWatchlistItem', id, updates),
+  reorderWatchlist: (orderedIds) => ipcRenderer.invoke('db:reorderWatchlist', orderedIds)
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api)
