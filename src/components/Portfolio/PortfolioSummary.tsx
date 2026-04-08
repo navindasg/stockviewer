@@ -55,8 +55,8 @@ export function PortfolioSummary({ filteredPositions, quotes }: PortfolioSummary
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
             className="rounded-lg bg-sv-surface border border-sv-border p-4 animate-pulse h-20"
@@ -67,7 +67,7 @@ export function PortfolioSummary({ filteredPositions, quotes }: PortfolioSummary
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
       <StatCard
         label="Total Portfolio Value"
         value={formatCurrency(summary.totalValue)}
@@ -89,6 +89,12 @@ export function PortfolioSummary({ filteredPositions, quotes }: PortfolioSummary
         label="Realized Gain/Loss"
         value={formatSignedCurrency(summary.totalRealizedGain)}
         colorClass={getGainColorClass(summary.totalRealizedGain)}
+      />
+      <StatCard
+        label="Total Return"
+        value={formatSignedCurrency(summary.totalReturn)}
+        subValue={formatPercent(summary.totalReturnPercent)}
+        colorClass={getGainColorClass(summary.totalReturn)}
       />
     </div>
   )

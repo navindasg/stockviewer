@@ -11,15 +11,6 @@ function matchesSearchText(position: Position, searchText: string): boolean {
   )
 }
 
-function matchesPositionStatus(
-  position: Position,
-  statusFilter: FilterState['positionStatus']
-): boolean {
-  if (statusFilter === 'all') return true
-  if (statusFilter === 'open') return position.status === 'OPEN'
-  return position.status === 'CLOSED'
-}
-
 function matchesGainStatus(
   position: Position,
   gainStatus: FilterState['gainStatus'],
@@ -51,13 +42,14 @@ function applyFilters(
   filters: FilterState,
   quotes: Readonly<Record<string, Quote>>
 ): ReadonlyArray<Position> {
-  return positions.filter(
-    (pos) =>
-      matchesSearchText(pos, filters.searchText) &&
-      matchesPositionStatus(pos, filters.positionStatus) &&
-      matchesGainStatus(pos, filters.gainStatus, quotes) &&
-      matchesSector(pos, filters.sectors, quotes)
-  )
+  return positions
+    .filter((pos) => pos.status === 'OPEN')
+    .filter(
+      (pos) =>
+        matchesSearchText(pos, filters.searchText) &&
+        matchesGainStatus(pos, filters.gainStatus, quotes) &&
+        matchesSector(pos, filters.sectors, quotes)
+    )
 }
 
 export function usePositions() {

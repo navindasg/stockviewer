@@ -7,6 +7,7 @@ import { DashboardView } from '../Views/DashboardView'
 import { PositionDetail } from '../Positions/PositionDetail'
 import { CompareView } from '../Views/CompareView'
 import { TransactionsView } from '../Views/TransactionsView'
+import { ClosedPositionsView } from '../Views/ClosedPositionsView'
 
 function renderView(activeView: ViewName) {
   switch (activeView) {
@@ -18,6 +19,8 @@ function renderView(activeView: ViewName) {
       return <CompareView />
     case 'transactions':
       return <TransactionsView />
+    case 'closed-positions':
+      return <ClosedPositionsView />
     default:
       return <DashboardView />
   }

@@ -61,6 +61,8 @@ function registerIpcHandlers(): void {
       totalUnrealizedGain: 0,
       totalUnrealizedGainPercent: 0,
       totalRealizedGain: 0,
+      totalReturn: 0,
+      totalReturnPercent: 0,
       positionCount: 0
     }
   })

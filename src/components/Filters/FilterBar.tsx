@@ -1,7 +1,6 @@
 import { useFilters } from '../../hooks/useFilters'
 import { SearchFilter } from './SearchFilter'
 import { GainLossFilter } from './GainLossFilter'
-import { PositionStatusFilter } from './PositionStatusFilter'
 import { SectorFilter } from './SectorFilter'
 import { DateRangeFilter } from './DateRangeFilter'
 
@@ -11,10 +10,6 @@ export function FilterBar() {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg bg-sv-surface border border-sv-border px-4 py-3">
       <SearchFilter />
-
-      <div className="h-5 w-px bg-sv-border" />
-
-      <PositionStatusFilter />
 
       <div className="h-5 w-px bg-sv-border" />
 

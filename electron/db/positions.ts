@@ -130,16 +130,24 @@ function computePosition(ticker: string): Position {
   let totalBuyShares = 0
   let totalBuyCost = 0
   let totalRealized = 0
+  let firstBuyDate: string | null = null
+  let lastSellDate: string | null = null
 
   for (const tx of transactions) {
     if (tx.type === 'BUY') {
       totalBuyCost += tx.shares * tx.price
       totalBuyShares += tx.shares
+      if (firstBuyDate === null || tx.date < firstBuyDate) {
+        firstBuyDate = tx.date
+      }
     } else {
       const avgCost = totalBuyShares > 0 ? totalBuyCost / totalBuyShares : 0
       totalRealized += (tx.price - avgCost) * tx.shares
       totalBuyCost -= avgCost * tx.shares
       totalBuyShares -= tx.shares
+      if (lastSellDate === null || tx.date > lastSellDate) {
+        lastSellDate = tx.date
+      }
     }
   }
 
@@ -160,7 +168,9 @@ function computePosition(ticker: string): Position {
     totalInvested,
     totalRealized,
     status: totalBuyShares > 0 ? 'OPEN' : 'CLOSED',
-    color: metadata?.color ?? '#3B82F6'
+    color: metadata?.color ?? '#3B82F6',
+    firstBuyDate,
+    lastSellDate
   }
 }
 

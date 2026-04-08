@@ -1,16 +1,14 @@
 import { create } from 'zustand'
 import type { Position, Quote, NewTransaction } from '../types/index'
 
-export type ViewName = 'dashboard' | 'position-detail' | 'compare' | 'transactions'
+export type ViewName = 'dashboard' | 'position-detail' | 'compare' | 'transactions' | 'closed-positions'
 export type GainStatus = 'all' | 'winners' | 'losers'
-export type PositionStatusFilter = 'all' | 'open' | 'closed'
 
 export interface FilterState {
   readonly sectors: ReadonlyArray<string>
   readonly dateFrom: string | null
   readonly dateTo: string | null
   readonly gainStatus: GainStatus
-  readonly positionStatus: PositionStatusFilter
   readonly searchText: string
 }
 
@@ -19,7 +17,6 @@ const DEFAULT_FILTERS: FilterState = {
   dateFrom: null,
   dateTo: null,
   gainStatus: 'all',
-  positionStatus: 'all',
   searchText: ''
 }
 
