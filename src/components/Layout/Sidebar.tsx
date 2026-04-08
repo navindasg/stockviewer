@@ -49,6 +49,15 @@ function TransactionsIcon() {
   )
 }
 
+function ClosedTradesIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 4l12 12M16 4L4 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="2" y="2" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  )
+}
+
 function CollapseIcon({ collapsed }: { readonly collapsed: boolean }) {
   return (
     <svg
@@ -74,7 +83,8 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
   { id: 'position-detail', label: 'Positions', icon: <PositionsIcon /> },
   { id: 'compare', label: 'Compare', icon: <CompareIcon /> },
-  { id: 'transactions', label: 'Transactions', icon: <TransactionsIcon /> }
+  { id: 'transactions', label: 'Transactions', icon: <TransactionsIcon /> },
+  { id: 'closed-positions', label: 'Closed Trades', icon: <ClosedTradesIcon /> }
 ]
 
 export function Sidebar() {

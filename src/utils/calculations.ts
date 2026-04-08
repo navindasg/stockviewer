@@ -5,11 +5,15 @@ interface CostBasisState {
   readonly cost: number
 }
 
-function buildCostBasisState(transactions: ReadonlyArray<Transaction>): {
+interface CostBasisResult {
   readonly state: CostBasisState
   readonly totalRealized: number
   readonly totalInvested: number
-} {
+  readonly firstBuyDate: string | null
+  readonly lastSellDate: string | null
+}
+
+function buildCostBasisState(transactions: ReadonlyArray<Transaction>): CostBasisResult {
   const sorted = [...transactions].sort(
     (a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at)
   )
@@ -18,24 +22,34 @@ function buildCostBasisState(transactions: ReadonlyArray<Transaction>): {
   let cost = 0
   let totalRealized = 0
   let totalInvested = 0
+  let firstBuyDate: string | null = null
+  let lastSellDate: string | null = null
 
   for (const tx of sorted) {
     if (tx.type === 'BUY') {
       cost += tx.shares * tx.price
       shares += tx.shares
       totalInvested += tx.shares * tx.price
+      if (firstBuyDate === null || tx.date < firstBuyDate) {
+        firstBuyDate = tx.date
+      }
     } else {
       const avgCost = shares > 0 ? cost / shares : 0
       totalRealized += (tx.price - avgCost) * tx.shares
       cost -= avgCost * tx.shares
       shares -= tx.shares
+      if (lastSellDate === null || tx.date > lastSellDate) {
+        lastSellDate = tx.date
+      }
     }
   }
 
   return {
     state: { shares, cost },
     totalRealized,
-    totalInvested
+    totalInvested,
+    firstBuyDate,
+    lastSellDate
   }
 }
 
@@ -59,7 +73,7 @@ export function computePosition(
   }
 
   const ticker = transactions[0].ticker
-  const { state, totalRealized, totalInvested } = buildCostBasisState(transactions)
+  const { state, totalRealized, totalInvested, firstBuyDate, lastSellDate } = buildCostBasisState(transactions)
   const costBasis = state.shares > 0 ? state.cost / state.shares : 0
 
   return {
@@ -70,7 +84,9 @@ export function computePosition(
     totalInvested,
     totalRealized,
     status: state.shares > 0 ? 'OPEN' : 'CLOSED',
-    color: color ?? '#3B82F6'
+    color: color ?? '#3B82F6',
+    firstBuyDate,
+    lastSellDate
   }
 }
 
@@ -113,6 +129,9 @@ export function computePortfolioSummary(
     totalValue - totalDayChange > 0
       ? (totalDayChange / (totalValue - totalDayChange)) * 100
       : 0
+  const totalReturn = totalUnrealizedGain + totalRealizedGain
+  const totalInvestedAll = positions.reduce((sum, p) => sum + p.totalInvested, 0)
+  const totalReturnPercent = totalInvestedAll > 0 ? (totalReturn / totalInvestedAll) * 100 : 0
 
   return {
     totalValue,
@@ -122,6 +141,8 @@ export function computePortfolioSummary(
     totalUnrealizedGain,
     totalUnrealizedGainPercent,
     totalRealizedGain,
+    totalReturn,
+    totalReturnPercent,
     positionCount
   }
 }

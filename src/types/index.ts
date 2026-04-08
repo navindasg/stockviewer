@@ -49,6 +49,8 @@ export interface Position {
   readonly totalRealized: number
   readonly status: PositionStatus
   readonly color: string
+  readonly firstBuyDate: string | null
+  readonly lastSellDate: string | null
 }
 
 export interface Quote {
@@ -88,6 +90,8 @@ export interface PortfolioSummary {
   readonly totalUnrealizedGain: number
   readonly totalUnrealizedGainPercent: number
   readonly totalRealizedGain: number
+  readonly totalReturn: number
+  readonly totalReturnPercent: number
   readonly positionCount: number
 }
 
