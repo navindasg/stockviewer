@@ -16,6 +16,14 @@ export interface ElectronAPI {
   removeWatchlistItem: (id: string) => Promise<void>
   updateWatchlistItem: (id: string, updates: Record<string, unknown>) => Promise<unknown>
   reorderWatchlist: (orderedIds: string[]) => Promise<void>
+  getTaxLots: (ticker: string) => Promise<unknown[]>
+  getLotAssignments: (sellTransactionId: string) => Promise<unknown[]>
+  getAvailableLots: (ticker: string) => Promise<unknown[]>
+  setCostBasisMethod: (ticker: string, method: string) => Promise<void>
+  getCostBasisMethod: (ticker: string) => Promise<string>
+  generateTaxReport: (year?: number) => Promise<unknown>
+  exportTaxReportCsv: (year?: number) => Promise<string>
+  addTransactionWithLots: (tx: Record<string, unknown>, lotSelections?: ReadonlyArray<{ lotId: string; shares: number }>) => Promise<unknown>
 }
 
 const api: ElectronAPI = {
@@ -34,7 +42,15 @@ const api: ElectronAPI = {
   addWatchlistItem: (item) => ipcRenderer.invoke('db:addWatchlistItem', item),
   removeWatchlistItem: (id) => ipcRenderer.invoke('db:removeWatchlistItem', id),
   updateWatchlistItem: (id, updates) => ipcRenderer.invoke('db:updateWatchlistItem', id, updates),
-  reorderWatchlist: (orderedIds) => ipcRenderer.invoke('db:reorderWatchlist', orderedIds)
+  reorderWatchlist: (orderedIds) => ipcRenderer.invoke('db:reorderWatchlist', orderedIds),
+  getTaxLots: (ticker) => ipcRenderer.invoke('db:getTaxLots', ticker),
+  getLotAssignments: (sellTransactionId) => ipcRenderer.invoke('db:getLotAssignments', sellTransactionId),
+  getAvailableLots: (ticker) => ipcRenderer.invoke('db:getAvailableLots', ticker),
+  setCostBasisMethod: (ticker, method) => ipcRenderer.invoke('db:setCostBasisMethod', ticker, method),
+  getCostBasisMethod: (ticker) => ipcRenderer.invoke('db:getCostBasisMethod', ticker),
+  generateTaxReport: (year) => ipcRenderer.invoke('db:generateTaxReport', year),
+  exportTaxReportCsv: (year) => ipcRenderer.invoke('db:exportTaxReportCsv', year),
+  addTransactionWithLots: (tx, lotSelections) => ipcRenderer.invoke('db:addTransactionWithLots', tx, lotSelections)
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api)

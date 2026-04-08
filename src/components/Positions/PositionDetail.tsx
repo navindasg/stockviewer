@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { useAppStore } from '../../stores/appStore'
 import { useMarketData } from '../../hooks/useMarketData'
 import { PriceChart } from '../Charts/PriceChart'
 import { TransactionHistory } from './TransactionHistory'
+import { TaxLotTable } from '../TaxLots/TaxLotTable'
+import { CostBasisMethodSelector } from '../TaxLots/CostBasisMethodSelector'
 import {
   formatCurrency,
   formatSignedCurrency,
   formatPercent,
   formatShares
 } from '../../utils/formatters'
-import type { Transaction, Quote, Position } from '../../types/index'
+import type { Transaction, Quote, Position, CostBasisMethod } from '../../types/index'
 
 interface PositionPickerProps {
   readonly positions: ReadonlyArray<Position>
@@ -166,6 +168,10 @@ function PositionDetailInner({
   onBack
 }: PositionDetailInnerProps) {
   const { quote, isStale } = useMarketData(ticker)
+  const taxLots = useAppStore((s) => s.taxLots)
+  const taxLotsLoading = useAppStore((s) => s.taxLotsLoading)
+  const fetchTaxLots = useAppStore((s) => s.fetchTaxLots)
+  const setCostBasisMethod = useAppStore((s) => s.setCostBasisMethod)
 
   useEffect(() => {
     let cancelled = false
@@ -186,6 +192,14 @@ function PositionDetailInner({
     return () => { cancelled = true }
   }, [ticker, setTransactions, setTxLoading])
 
+  useEffect(() => {
+    fetchTaxLots(ticker).catch(() => {})
+  }, [ticker, fetchTaxLots])
+
+  const handleMethodChange = useCallback(async (_ticker: string, method: CostBasisMethod) => {
+    await setCostBasisMethod(_ticker, method)
+  }, [setCostBasisMethod])
+
   return (
     <div className="flex flex-col h-full gap-4 p-4">
       <DetailHeader
@@ -197,16 +211,22 @@ function PositionDetailInner({
       />
 
       <div className="flex flex-1 gap-4 min-h-0">
-        <div className="w-[60%] min-h-0">
+        <div className="w-[60%] min-h-0 flex flex-col gap-4">
           <PriceChart
             ticker={ticker}
             transactions={[...transactions]}
             costBasis={position.costBasis}
             color={position.color}
           />
+          <TaxLotTable lots={taxLots} quote={quote} loading={taxLotsLoading} />
         </div>
 
         <div className="w-[40%] flex flex-col gap-4 min-h-0 overflow-auto">
+          <CostBasisMethodSelector
+            ticker={ticker}
+            currentMethod={position.costBasisMethod}
+            onMethodChange={handleMethodChange}
+          />
           <StatsPanel position={position} quote={quote} transactions={transactions} />
           {txLoading ? (
             <div className="text-sv-text-muted text-sm text-center py-4">Loading transactions...</div>
