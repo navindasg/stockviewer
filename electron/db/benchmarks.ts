@@ -22,18 +22,34 @@ interface DividendRow {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getAllEquityTransactions(): ReadonlyArray<Transaction> {
+function getAllEquityTransactions(portfolioId?: number): ReadonlyArray<Transaction> {
   const db = getDatabase()
-  return db.prepare(
-    "SELECT * FROM transactions WHERE asset_type = 'EQUITY' ORDER BY date ASC, created_at ASC"
-  ).all() as Transaction[]
+
+  let query = "SELECT * FROM transactions WHERE asset_type = 'EQUITY'"
+  const params: unknown[] = []
+
+  if (portfolioId !== undefined) {
+    query += ' AND portfolio_id = ?'
+    params.push(portfolioId)
+  }
+
+  query += ' ORDER BY date ASC, created_at ASC'
+  return db.prepare(query).all(...params) as Transaction[]
 }
 
-function getAllDividends(from: string, to: string): ReadonlyArray<DividendRow> {
+function getAllDividends(from: string, to: string, portfolioId?: number): ReadonlyArray<DividendRow> {
   const db = getDatabase()
-  return db.prepare(
-    'SELECT ticker, pay_date, total_amount FROM dividends WHERE pay_date >= ? AND pay_date <= ? ORDER BY pay_date ASC'
-  ).all(from, to) as DividendRow[]
+
+  let query = 'SELECT ticker, pay_date, total_amount FROM dividends WHERE pay_date >= ? AND pay_date <= ?'
+  const params: unknown[] = [from, to]
+
+  if (portfolioId !== undefined) {
+    query += ' AND portfolio_id = ?'
+    params.push(portfolioId)
+  }
+
+  query += ' ORDER BY pay_date ASC'
+  return db.prepare(query).all(...params) as DividendRow[]
 }
 
 function generateDateRange(from: string, to: string): ReadonlyArray<string> {
@@ -204,8 +220,8 @@ function buildCashFlows(
  *
  * Returns daily cumulative return series rebased to 0% at the start.
  */
-export function computePortfolioTWR(from: string, to: string): ReadonlyArray<TWRDataPoint> {
-  const allTransactions = getAllEquityTransactions()
+export function computePortfolioTWR(from: string, to: string, portfolioId?: number): ReadonlyArray<TWRDataPoint> {
+  const allTransactions = getAllEquityTransactions(portfolioId)
 
   if (allTransactions.length === 0) {
     return []
@@ -225,7 +241,7 @@ export function computePortfolioTWR(from: string, to: string): ReadonlyArray<TWR
     (tx) => tx.date.slice(0, 10) >= effectiveFrom && tx.date.slice(0, 10) <= to
   )
 
-  const dividends = getAllDividends(effectiveFrom, to)
+  const dividends = getAllDividends(effectiveFrom, to, portfolioId)
   const dates = generateDateRange(effectiveFrom, to)
 
   if (dates.length === 0) {

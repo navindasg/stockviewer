@@ -8,6 +8,23 @@ import {
   removeAssignmentsForTransaction,
   recomputeLotsForTicker
 } from './taxLots'
+import { getDefaultPortfolioId } from './portfolios'
+
+function rowToTransaction(row: Record<string, unknown>): Transaction {
+  return {
+    id: row.id as string,
+    ticker: row.ticker as string,
+    type: row.type as Transaction['type'],
+    shares: row.shares as number,
+    price: row.price as number,
+    date: row.date as string,
+    fees: row.fees as number,
+    notes: row.notes as string | null,
+    portfolioId: row.portfolio_id as number | null,
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string
+  }
+}
 
 export function addTransaction(
   tx: NewTransaction,
@@ -19,17 +36,18 @@ export function addTransaction(
   const fees = tx.fees ?? 0
   const notes = tx.notes ?? null
   const ticker = tx.ticker.toUpperCase()
+  const portfolioId = tx.portfolioId ?? getDefaultPortfolioId()
 
   if (tx.type === 'SELL') {
-    validateSell(ticker, tx.shares, tx.date)
+    validateSell(ticker, tx.shares, tx.date, undefined, portfolioId)
   }
 
   const stmt = db.prepare(`
-    INSERT INTO transactions (id, ticker, type, shares, price, date, fees, notes, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO transactions (id, ticker, type, shares, price, date, fees, notes, portfolio_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
-  stmt.run(id, ticker, tx.type, tx.shares, tx.price, tx.date, fees, notes, now, now)
+  stmt.run(id, ticker, tx.type, tx.shares, tx.price, tx.date, fees, notes, portfolioId, now, now)
 
   const transaction: Transaction = {
     id,
@@ -40,6 +58,7 @@ export function addTransaction(
     date: tx.date,
     fees,
     notes,
+    portfolioId,
     created_at: now,
     updated_at: now
   }
@@ -57,10 +76,11 @@ export function addTransaction(
 export function updateTransaction(id: string, updates: Partial<NewTransaction>): Transaction {
   const db = getDatabase()
 
-  const existing = db.prepare('SELECT * FROM transactions WHERE id = ?').get(id) as Transaction | undefined
-  if (!existing) {
+  const existingRow = db.prepare('SELECT * FROM transactions WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  if (!existingRow) {
     throw new Error(`Transaction ${id} not found`)
   }
+  const existing = rowToTransaction(existingRow)
 
   const merged = {
     ticker: updates.ticker?.toUpperCase() ?? existing.ticker,
@@ -72,8 +92,10 @@ export function updateTransaction(id: string, updates: Partial<NewTransaction>):
     notes: updates.notes !== undefined ? (updates.notes ?? null) : existing.notes
   }
 
+  const portfolioId = existing.portfolioId ?? undefined
+
   if (merged.type === 'SELL') {
-    validateSell(merged.ticker, merged.shares, merged.date, id)
+    validateSell(merged.ticker, merged.shares, merged.date, id, portfolioId)
   }
 
   const now = new Date().toISOString()
@@ -85,9 +107,9 @@ export function updateTransaction(id: string, updates: Partial<NewTransaction>):
       WHERE id = ?
     `).run(merged.ticker, merged.type, merged.shares, merged.price, merged.date, merged.fees, merged.notes, now, id)
 
-    recomputeLotsForTicker(merged.ticker)
+    recomputeLotsForTicker(merged.ticker, portfolioId)
     if (existing.ticker !== merged.ticker) {
-      recomputeLotsForTicker(existing.ticker)
+      recomputeLotsForTicker(existing.ticker, portfolioId)
     }
   })()
 
@@ -100,6 +122,7 @@ export function updateTransaction(id: string, updates: Partial<NewTransaction>):
     date: merged.date,
     fees: merged.fees,
     notes: merged.notes,
+    portfolioId: existing.portfolioId,
     created_at: existing.created_at,
     updated_at: now
   }
@@ -108,15 +131,17 @@ export function updateTransaction(id: string, updates: Partial<NewTransaction>):
 export function deleteTransaction(id: string): void {
   const db = getDatabase()
 
-  const existing = db.prepare('SELECT * FROM transactions WHERE id = ?').get(id) as Transaction | undefined
-  if (!existing) {
+  const existingRow = db.prepare('SELECT * FROM transactions WHERE id = ?').get(id) as Record<string, unknown> | undefined
+  if (!existingRow) {
     throw new Error(`Transaction ${id} not found`)
   }
+  const existing = rowToTransaction(existingRow)
+  const portfolioId = existing.portfolioId ?? undefined
 
   db.transaction(() => {
     removeAssignmentsForTransaction(id)
     db.prepare('DELETE FROM transactions WHERE id = ?').run(id)
-    recomputeLotsForTicker(existing.ticker)
+    recomputeLotsForTicker(existing.ticker, portfolioId)
   })()
 }
 
@@ -141,25 +166,59 @@ export function getTransactions(filters?: TransactionFilters): ReadonlyArray<Tra
     conditions.push('date <= ?')
     params.push(filters.toDate)
   }
+  if (filters?.portfolioId !== undefined) {
+    conditions.push('portfolio_id = ?')
+    params.push(filters.portfolioId)
+  }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-  const rows = db.prepare(`SELECT * FROM transactions ${where} ORDER BY date ASC, created_at ASC`).all(...params)
+  const rows = db.prepare(`SELECT * FROM transactions ${where} ORDER BY date ASC, created_at ASC`).all(...params) as Array<Record<string, unknown>>
 
-  return rows as Transaction[]
+  return rows.map((row) => ({
+    id: row.id as string,
+    ticker: row.ticker as string,
+    type: row.type as Transaction['type'],
+    shares: row.shares as number,
+    price: row.price as number,
+    date: row.date as string,
+    fees: row.fees as number,
+    notes: row.notes as string | null,
+    portfolioId: row.portfolio_id as number | null,
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string
+  }))
 }
 
-export function getPositions(): ReadonlyArray<Position> {
+export function getPositions(portfolioId?: number): ReadonlyArray<Position> {
   const db = getDatabase()
-  const tickers = db.prepare("SELECT DISTINCT ticker FROM transactions WHERE asset_type = 'EQUITY' ORDER BY ticker").all() as Array<{ ticker: string }>
 
-  return tickers.map((row) => computePosition(row.ticker))
+  let query = "SELECT DISTINCT ticker FROM transactions WHERE asset_type = 'EQUITY'"
+  const params: unknown[] = []
+
+  if (portfolioId !== undefined) {
+    query += ' AND portfolio_id = ?'
+    params.push(portfolioId)
+  }
+
+  query += ' ORDER BY ticker'
+  const tickers = db.prepare(query).all(...params) as Array<{ ticker: string }>
+
+  return tickers.map((row) => computePosition(row.ticker, portfolioId))
 }
 
-function computePosition(ticker: string): Position {
+function computePosition(ticker: string, portfolioId?: number): Position {
   const db = getDatabase()
-  const transactions = db.prepare(
-    "SELECT * FROM transactions WHERE ticker = ? AND asset_type = 'EQUITY' ORDER BY date ASC, created_at ASC"
-  ).all(ticker) as Transaction[]
+
+  let txQuery = "SELECT * FROM transactions WHERE ticker = ? AND asset_type = 'EQUITY'"
+  const txParams: unknown[] = [ticker]
+
+  if (portfolioId !== undefined) {
+    txQuery += ' AND portfolio_id = ?'
+    txParams.push(portfolioId)
+  }
+
+  txQuery += ' ORDER BY date ASC, created_at ASC'
+  const transactions = db.prepare(txQuery).all(...txParams) as Transaction[]
 
   let firstBuyDate: string | null = null
   let lastSellDate: string | null = null
@@ -180,9 +239,17 @@ function computePosition(ticker: string): Position {
     .filter((tx) => tx.type === 'BUY')
     .reduce((sum, tx) => sum + tx.shares * tx.price, 0)
 
-  const remainingLots = db.prepare(
-    'SELECT remaining_shares, cost_per_share FROM tax_lots WHERE ticker = ? AND remaining_shares > 0'
-  ).all(ticker) as ReadonlyArray<{ remaining_shares: number; cost_per_share: number }>
+  let lotsQuery = 'SELECT tl.remaining_shares, tl.cost_per_share FROM tax_lots tl'
+  const lotsParams: unknown[] = [ticker]
+
+  if (portfolioId !== undefined) {
+    lotsQuery += ' JOIN transactions t ON tl.transaction_id = t.id WHERE tl.ticker = ? AND tl.remaining_shares > 0 AND t.portfolio_id = ?'
+    lotsParams.push(portfolioId)
+  } else {
+    lotsQuery += ' WHERE tl.ticker = ? AND tl.remaining_shares > 0'
+  }
+
+  const remainingLots = db.prepare(lotsQuery).all(...lotsParams) as ReadonlyArray<{ remaining_shares: number; cost_per_share: number }>
 
   let totalShares = 0
   let totalRemainingCost = 0
@@ -192,11 +259,22 @@ function computePosition(ticker: string): Position {
   }
   const costBasis = totalShares > 0 ? totalRemainingCost / totalShares : 0
 
-  const assignments = db.prepare(`
+  let assignQuery = `
     SELECT la.realized_gain, la.is_short_term FROM lot_assignments la
-    JOIN tax_lots tl ON la.tax_lot_id = tl.id
-    WHERE tl.ticker = ?
-  `).all(ticker) as ReadonlyArray<{ realized_gain: number; is_short_term: number }>
+    JOIN tax_lots tl ON la.tax_lot_id = tl.id`
+  const assignParams: unknown[] = [ticker]
+
+  if (portfolioId !== undefined) {
+    assignQuery += `
+    JOIN transactions t ON tl.transaction_id = t.id
+    WHERE tl.ticker = ? AND t.portfolio_id = ?`
+    assignParams.push(portfolioId)
+  } else {
+    assignQuery += `
+    WHERE tl.ticker = ?`
+  }
+
+  const assignments = db.prepare(assignQuery).all(...assignParams) as ReadonlyArray<{ realized_gain: number; is_short_term: number }>
 
   let totalRealized = 0
   let shortTermGain = 0
@@ -234,7 +312,7 @@ function computePosition(ticker: string): Position {
   }
 }
 
-function validateSell(ticker: string, sharesToSell: number, sellDate: string, excludeId?: string): void {
+function validateSell(ticker: string, sharesToSell: number, sellDate: string, excludeId?: string, portfolioId?: number): void {
   const db = getDatabase()
 
   let query = `
@@ -246,6 +324,11 @@ function validateSell(ticker: string, sharesToSell: number, sellDate: string, ex
   if (excludeId) {
     query += ' AND id != ?'
     params.push(excludeId)
+  }
+
+  if (portfolioId !== undefined) {
+    query += ' AND portfolio_id = ?'
+    params.push(portfolioId)
   }
 
   query += ' ORDER BY date ASC, created_at ASC'

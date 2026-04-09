@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAppStore } from '../../stores/appStore'
+import { usePortfolioStore } from '../../stores/portfolioStore'
 import { useFilters } from '../../hooks/useFilters'
 import { EditTransactionModal } from '../Forms/EditTransactionModal'
 import { DeleteConfirmDialog } from '../Forms/DeleteConfirmDialog'
@@ -113,16 +114,20 @@ export function TransactionsView() {
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [deletingTx, setDeletingTx] = useState<Transaction | null>(null)
 
+  const activePortfolioId = usePortfolioStore((s) => s.activePortfolioId)
+
   const loadTransactions = useCallback(async () => {
     try {
-      const data = await window.electronAPI.getTransactions()
+      const data = await window.electronAPI.getTransactions(
+        activePortfolioId !== null ? { portfolioId: activePortfolioId } : undefined
+      )
       setTransactions(data)
     } catch (error) {
       throw new Error(
         `Failed to load transactions: ${error instanceof Error ? error.message : String(error)}`
       )
     }
-  }, [])
+  }, [activePortfolioId])
 
   useEffect(() => {
     loadTransactions()

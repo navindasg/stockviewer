@@ -431,23 +431,53 @@ export function setCostBasisMethod(ticker: string, method: CostBasisMethod): voi
   }
 }
 
-export function recomputeLotsForTicker(ticker: string): void {
+export function recomputeLotsForTicker(ticker: string, portfolioId?: number): void {
   const db = getDatabase()
   const method = getCostBasisMethod(ticker)
 
   db.transaction(() => {
-    db.prepare('DELETE FROM lot_assignments WHERE tax_lot_id IN (SELECT id FROM tax_lots WHERE ticker = ?)').run(ticker)
-    db.prepare('DELETE FROM tax_lots WHERE ticker = ?').run(ticker)
+    if (portfolioId !== undefined) {
+      // Portfolio-scoped: only recompute lots for transactions in this portfolio
+      db.prepare(`
+        DELETE FROM lot_assignments WHERE tax_lot_id IN (
+          SELECT tl.id FROM tax_lots tl
+          JOIN transactions t ON tl.transaction_id = t.id
+          WHERE tl.ticker = ? AND t.portfolio_id = ?
+        )
+      `).run(ticker, portfolioId)
 
-    const transactions = db.prepare(
-      'SELECT * FROM transactions WHERE ticker = ? ORDER BY date ASC, created_at ASC'
-    ).all(ticker) as Transaction[]
+      db.prepare(`
+        DELETE FROM tax_lots WHERE ticker = ? AND transaction_id IN (
+          SELECT id FROM transactions WHERE ticker = ? AND portfolio_id = ?
+        )
+      `).run(ticker, ticker, portfolioId)
 
-    for (const tx of transactions) {
-      if (tx.type === 'BUY') {
-        createTaxLot(tx)
-      } else {
-        assignLotsForSell(tx, method)
+      const transactions = db.prepare(
+        "SELECT * FROM transactions WHERE ticker = ? AND portfolio_id = ? AND asset_type = 'EQUITY' ORDER BY date ASC, created_at ASC"
+      ).all(ticker, portfolioId) as Transaction[]
+
+      for (const tx of transactions) {
+        if (tx.type === 'BUY') {
+          createTaxLot(tx)
+        } else {
+          assignLotsForSell(tx, method)
+        }
+      }
+    } else {
+      // Global: recompute all lots for this ticker across all portfolios
+      db.prepare('DELETE FROM lot_assignments WHERE tax_lot_id IN (SELECT id FROM tax_lots WHERE ticker = ?)').run(ticker)
+      db.prepare('DELETE FROM tax_lots WHERE ticker = ?').run(ticker)
+
+      const transactions = db.prepare(
+        "SELECT * FROM transactions WHERE ticker = ? AND asset_type = 'EQUITY' ORDER BY date ASC, created_at ASC"
+      ).all(ticker) as Transaction[]
+
+      for (const tx of transactions) {
+        if (tx.type === 'BUY') {
+          createTaxLot(tx)
+        } else {
+          assignLotsForSell(tx, method)
+        }
       }
     }
   })()

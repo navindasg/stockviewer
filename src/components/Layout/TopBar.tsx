@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { usePortfolioStats } from '../../hooks/usePortfolioStats'
+import { PortfolioSwitcher } from '../Portfolios/PortfolioSwitcher'
 import {
   formatCurrency,
   formatSignedCurrency,
@@ -184,6 +185,7 @@ export function TopBar() {
   return (
     <header className="flex items-center justify-between h-14 px-4 bg-sv-surface border-b border-sv-border">
       <div className="flex items-center gap-6">
+        <PortfolioSwitcher />
         <div className="flex items-center gap-2">
           <span className="text-sv-text-secondary text-sm">Portfolio Value</span>
           <span className="font-mono text-lg font-semibold text-sv-text tabular-nums">

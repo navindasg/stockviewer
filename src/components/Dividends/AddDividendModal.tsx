@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useDividendStore } from '../../stores/dividendStore'
 import { useAppStore } from '../../stores/appStore'
+import { usePortfolioStore } from '../../stores/portfolioStore'
 import { TickerSearch } from '../Forms/TickerSearch'
+import { PortfolioSelect } from '../Portfolios/PortfolioSelect'
 import { INPUT_CLASS, INPUT_CLASS_NO_MONO, TEXTAREA_CLASS } from '../Forms/formUtils'
 import type { DividendType, SearchResult, Quote } from '../../types/index'
 
@@ -21,6 +23,7 @@ interface FormState {
   readonly notes: string
   readonly companyName: string
   readonly tickerValidated: boolean
+  readonly portfolioId: number | undefined
 }
 
 interface FormErrors {
@@ -37,6 +40,7 @@ function getTodayString(): string {
 
 function createInitialState(prefillTicker?: string, prefillShares?: number): FormState {
   const today = getTodayString()
+  const activePortfolioId = usePortfolioStore.getState().activePortfolioId
   return {
     ticker: prefillTicker ?? '',
     exDate: today,
@@ -46,7 +50,8 @@ function createInitialState(prefillTicker?: string, prefillShares?: number): For
     type: 'CASH',
     notes: '',
     companyName: '',
-    tickerValidated: !!prefillTicker
+    tickerValidated: !!prefillTicker,
+    portfolioId: activePortfolioId ?? undefined
   }
 }
 
@@ -180,7 +185,8 @@ export function AddDividendModal({ isOpen, onClose, prefillTicker }: AddDividend
         amountPerShare: parseFloat(form.amountPerShare),
         sharesAtDate: parseFloat(form.sharesAtDate),
         type: form.type,
-        notes: form.notes || undefined
+        notes: form.notes || undefined,
+        portfolioId: form.portfolioId
       })
 
       if (form.type === 'REINVESTED') {
@@ -251,6 +257,11 @@ export function AddDividendModal({ isOpen, onClose, prefillTicker }: AddDividend
               <p className="mt-1 text-xs text-sv-negative">{errors.ticker}</p>
             )}
           </div>
+
+          <PortfolioSelect
+            value={form.portfolioId}
+            onChange={(id) => updateField('portfolioId', id)}
+          />
 
           <div>
             <label className="block text-sm font-medium text-sv-text-secondary mb-1">Type</label>
