@@ -18,6 +18,28 @@ export type {
 
 export type CostBasisMethod = 'FIFO' | 'LIFO' | 'AVGCOST' | 'SPECIFIC'
 
+export interface Portfolio {
+  readonly id: number
+  readonly name: string
+  readonly description: string | null
+  readonly isDefault: boolean
+  readonly defaultCostBasisMethod: CostBasisMethod
+  readonly createdAt: string
+  readonly updatedAt: string
+}
+
+export interface NewPortfolio {
+  readonly name: string
+  readonly description?: string
+  readonly defaultCostBasisMethod?: CostBasisMethod
+}
+
+export interface UpdatePortfolio {
+  readonly name?: string
+  readonly description?: string | null
+  readonly defaultCostBasisMethod?: CostBasisMethod
+}
+
 export interface TaxLot {
   readonly id: string
   readonly transactionId: string
@@ -77,7 +99,7 @@ export interface ElectronAPI {
   getQuotes: (tickers: string[]) => Promise<Quote[]>
   getHistoricalPrices: (ticker: string, from: string, to: string) => Promise<PricePoint[]>
   searchTicker: (query: string) => Promise<SearchResult[]>
-  getPositions: () => Promise<Position[]>
+  getPositions: (portfolioId?: number) => Promise<Position[]>
   getPortfolioSummary: () => Promise<PortfolioSummary>
   getWatchlist: () => Promise<WatchlistItem[]>
   addWatchlistItem: (item: NewWatchlistItem) => Promise<WatchlistItem>
@@ -96,20 +118,26 @@ export interface ElectronAPI {
   addDividend: (dividend: NewDividend) => Promise<Dividend>
   updateDividend: (id: string, updates: Partial<NewDividend>) => Promise<Dividend>
   deleteDividend: (id: string) => Promise<void>
-  getDividendSummary: () => Promise<PortfolioDividendSummary>
+  getDividendSummary: (portfolioId?: number) => Promise<PortfolioDividendSummary>
   getDividendHistory: (ticker: string, from?: string) => Promise<DividendHistoryEntry[]>
   getDividendInfo: (ticker: string) => Promise<DividendInfo>
   // Benchmarking
-  getPortfolioTWR: (from: string, to: string) => Promise<TWRDataPoint[]>
+  getPortfolioTWR: (from: string, to: string, portfolioId?: number) => Promise<TWRDataPoint[]>
   getBenchmarkTWR: (ticker: string, from: string, to: string) => Promise<TWRDataPoint[]>
   getBenchmarkStats: (benchmarkTicker: string, from: string, to: string) => Promise<BenchmarkStats>
-  getBenchmarkData: (benchmarkTicker: string, from: string, to: string) => Promise<BenchmarkData>
+  getBenchmarkData: (benchmarkTicker: string, from: string, to: string, portfolioId?: number) => Promise<BenchmarkData>
   // Options
   addOptionTransaction: (tx: NewOptionTransaction) => Promise<OptionTransaction>
   deleteOptionTransaction: (id: string) => Promise<void>
   getOptionTransactions: (filters?: OptionPositionFilters) => Promise<OptionTransaction[]>
   getOptionPositions: (filters?: OptionPositionFilters) => Promise<OptionPosition[]>
   getOptionsChain: (ticker: string, expirationDate?: string) => Promise<OptionsChainData>
+  // Portfolios
+  listPortfolios: () => Promise<Portfolio[]>
+  createPortfolio: (portfolio: NewPortfolio) => Promise<Portfolio>
+  updatePortfolio: (id: number, updates: UpdatePortfolio) => Promise<Portfolio>
+  deletePortfolio: (id: number) => Promise<void>
+  getPortfolio: (id: number) => Promise<Portfolio>
 }
 
 export type TransactionType = 'BUY' | 'SELL'
@@ -125,6 +153,7 @@ export interface Dividend {
   readonly sharesAtDate: number
   readonly type: DividendType
   readonly linkedTransactionId: string | null
+  readonly portfolioId: number | null
   readonly notes: string | null
   readonly createdAt: string
   readonly updatedAt: string
@@ -138,6 +167,7 @@ export interface NewDividend {
   readonly sharesAtDate: number
   readonly type: DividendType
   readonly notes?: string
+  readonly portfolioId?: number
 }
 
 export interface DividendSummary {
@@ -185,6 +215,7 @@ export interface Transaction {
   readonly date: string
   readonly fees: number
   readonly notes: string | null
+  readonly portfolioId: number | null
   readonly created_at: string
   readonly updated_at: string
 }
@@ -197,6 +228,7 @@ export interface NewTransaction {
   readonly date: string
   readonly fees?: number
   readonly notes?: string
+  readonly portfolioId?: number
 }
 
 export type PositionStatus = 'OPEN' | 'CLOSED'
@@ -265,6 +297,7 @@ export interface TransactionFilters {
   readonly type?: TransactionType
   readonly fromDate?: string
   readonly toDate?: string
+  readonly portfolioId?: number
 }
 
 export interface WatchlistItem {
@@ -288,6 +321,7 @@ export interface DividendFilters {
   readonly fromDate?: string
   readonly toDate?: string
   readonly type?: DividendType
+  readonly portfolioId?: number
 }
 
 // Benchmarking types

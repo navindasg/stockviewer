@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { TWRDataPoint, BenchmarkStats, BenchmarkTimeRange } from '../types/index'
+import { usePortfolioStore } from './portfolioStore'
 
 interface BenchmarkState {
   readonly benchmarkTicker: string
@@ -66,7 +67,8 @@ export const useBenchmarkStore = create<BenchmarkStore>()((set, get) => ({
       await window.electronAPI.getHistoricalPrices(benchmarkTicker, from, to)
 
       // Single IPC call computes portfolio TWR, benchmark TWR, and stats together
-      const data = await window.electronAPI.getBenchmarkData(benchmarkTicker, from, to)
+      const portfolioId = usePortfolioStore.getState().activePortfolioId
+      const data = await window.electronAPI.getBenchmarkData(benchmarkTicker, from, to, portfolioId ?? undefined)
 
       set({
         portfolioTWR: data.portfolioTWR,

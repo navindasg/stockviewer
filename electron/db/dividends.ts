@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { getDatabase } from './database'
 import { addTransaction } from './positions'
+import { getDefaultPortfolioId } from './portfolios'
 import type {
   Dividend,
   NewDividend,
@@ -19,6 +20,7 @@ interface DividendRow {
   readonly shares_at_date: number
   readonly type: string
   readonly linked_transaction_id: string | null
+  readonly portfolio_id: number | null
   readonly notes: string | null
   readonly created_at: string
   readonly updated_at: string
@@ -35,6 +37,7 @@ function rowToDividend(row: DividendRow): Dividend {
     sharesAtDate: row.shares_at_date,
     type: row.type as Dividend['type'],
     linkedTransactionId: row.linked_transaction_id,
+    portfolioId: row.portfolio_id,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -48,6 +51,7 @@ export function addDividend(input: NewDividend): Dividend {
   const ticker = input.ticker.toUpperCase()
   const totalAmount = input.amountPerShare * input.sharesAtDate
   const notes = input.notes ?? null
+  const portfolioId = input.portfolioId ?? getDefaultPortfolioId()
 
   let linkedTransactionId: string | null = null
 
@@ -65,18 +69,19 @@ export function addDividend(input: NewDividend): Dividend {
         price: dripPrice,
         date: input.payDate,
         fees: 0,
-        notes: `DRIP reinvestment from ${input.exDate} dividend`
+        notes: `DRIP reinvestment from ${input.exDate} dividend`,
+        portfolioId
       })
       linkedTransactionId = dripTransaction.id
     }
 
     db.prepare(`
-      INSERT INTO dividends (id, ticker, ex_date, pay_date, amount_per_share, total_amount, shares_at_date, type, linked_transaction_id, notes, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO dividends (id, ticker, ex_date, pay_date, amount_per_share, total_amount, shares_at_date, type, linked_transaction_id, portfolio_id, notes, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, ticker, input.exDate, input.payDate,
       input.amountPerShare, totalAmount, input.sharesAtDate,
-      input.type, linkedTransactionId, notes, now, now
+      input.type, linkedTransactionId, portfolioId, notes, now, now
     )
 
     return {
@@ -89,6 +94,7 @@ export function addDividend(input: NewDividend): Dividend {
       sharesAtDate: input.sharesAtDate,
       type: input.type,
       linkedTransactionId,
+      portfolioId,
       notes,
       createdAt: now,
       updatedAt: now
@@ -140,6 +146,10 @@ export function getDividends(filters?: DividendFilters): ReadonlyArray<Dividend>
   if (filters?.toDate) {
     conditions.push('ex_date <= ?')
     params.push(filters.toDate)
+  }
+  if (filters?.portfolioId !== undefined) {
+    conditions.push('portfolio_id = ?')
+    params.push(filters.portfolioId)
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -224,6 +234,7 @@ export function updateDividend(id: string, updates: Partial<NewDividend>): Divid
       sharesAtDate: merged.sharesAtDate,
       type: merged.type as Dividend['type'],
       linkedTransactionId,
+      portfolioId: existing.portfolio_id,
       notes: merged.notes,
       createdAt: existing.created_at,
       updatedAt: now
@@ -247,7 +258,7 @@ export function deleteDividend(id: string): void {
   })()
 }
 
-export function getDividendSummary(): PortfolioDividendSummary {
+export function getDividendSummary(portfolioId?: number): PortfolioDividendSummary {
   const db = getDatabase()
   const now = new Date()
   const yearStart = `${now.getFullYear()}-01-01`
@@ -255,9 +266,16 @@ export function getDividendSummary(): PortfolioDividendSummary {
   trailing12m.setFullYear(trailing12m.getFullYear() - 1)
   const trailing12mStr = trailing12m.toISOString().split('T')[0]
 
-  const allDividends = db.prepare(
-    'SELECT * FROM dividends ORDER BY ex_date DESC'
-  ).all() as DividendRow[]
+  let query = 'SELECT * FROM dividends'
+  const params: unknown[] = []
+
+  if (portfolioId !== undefined) {
+    query += ' WHERE portfolio_id = ?'
+    params.push(portfolioId)
+  }
+
+  query += ' ORDER BY ex_date DESC'
+  const allDividends = db.prepare(query).all(...params) as DividendRow[]
 
   if (allDividends.length === 0) {
     return {
@@ -362,10 +380,17 @@ function computeAnnualizedIncome(rows: ReadonlyArray<DividendRow>): number {
   return (totalIncome / daySpan) * 365
 }
 
-export function getTotalDividendIncome(): number {
+export function getTotalDividendIncome(portfolioId?: number): number {
   const db = getDatabase()
-  const result = db.prepare(
-    'SELECT COALESCE(SUM(total_amount), 0) as total FROM dividends'
-  ).get() as { total: number }
+
+  let query = 'SELECT COALESCE(SUM(total_amount), 0) as total FROM dividends'
+  const params: unknown[] = []
+
+  if (portfolioId !== undefined) {
+    query += ' WHERE portfolio_id = ?'
+    params.push(portfolioId)
+  }
+
+  const result = db.prepare(query).get(...params) as { total: number }
   return result.total
 }

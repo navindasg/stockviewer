@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { getDatabase } from './database'
+import { getDefaultPortfolioId } from './portfolios'
 import { buildOccSymbol } from '../../src/utils/occSymbol'
 import type {
   OptionAction,
@@ -38,23 +39,24 @@ export function addOptionTransaction(tx: NewOptionTransaction): OptionTransactio
   const fees = tx.fees ?? 0
   const notes = tx.notes ?? null
   const multiplier = 100
+  const portfolioId = tx.portfolioId ?? getDefaultPortfolioId()
 
   if (CLOSING_ACTIONS.has(tx.optionAction) && tx.optionAction !== 'EXPIRE') {
-    validateOptionClose(ticker, tx.optionType, tx.strikePrice, tx.expirationDate, tx.contracts, tx.optionAction)
+    validateOptionClose(ticker, tx.optionType, tx.strikePrice, tx.expirationDate, tx.contracts, tx.optionAction, portfolioId)
   }
 
   const stmt = db.prepare(`
     INSERT INTO transactions (
       id, ticker, type, shares, price, date, fees, notes,
       asset_type, option_type, strike_price, expiration_date, contract_multiplier, option_action,
-      created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPTION', ?, ?, ?, ?, ?, ?, ?)
+      portfolio_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPTION', ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   stmt.run(
     id, ticker, type, tx.contracts, tx.price, tx.date, fees, notes,
     tx.optionType, tx.strikePrice, tx.expirationDate, multiplier, tx.optionAction,
-    now, now
+    portfolioId, now, now
   )
 
   return {
@@ -105,6 +107,10 @@ export function getOptionTransactions(
     conditions.push('option_type = ?')
     params.push(filters.optionType)
   }
+  if (filters?.portfolioId !== undefined) {
+    conditions.push('portfolio_id = ?')
+    params.push(filters.portfolioId)
+  }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
   const rows = db.prepare(
@@ -129,6 +135,10 @@ export function getOptionPositions(
   if (filters?.optionType) {
     query += ' AND option_type = ?'
     params.push(filters.optionType)
+  }
+  if (filters?.portfolioId !== undefined) {
+    query += ' AND portfolio_id = ?'
+    params.push(filters.portfolioId)
   }
 
   query += ' ORDER BY ticker, expiration_date, strike_price'
@@ -294,15 +304,24 @@ function validateOptionClose(
   strikePrice: number,
   expirationDate: string,
   contractsToClose: number,
-  action: OptionAction
+  action: OptionAction,
+  portfolioId?: number
 ): void {
   const db = getDatabase()
 
-  const transactions = db.prepare(`
+  let query = `
     SELECT option_action, shares FROM transactions
-    WHERE asset_type = 'OPTION' AND ticker = ? AND option_type = ? AND strike_price = ? AND expiration_date = ?
-    ORDER BY date ASC, created_at ASC
-  `).all(ticker, optionType, strikePrice, expirationDate) as ReadonlyArray<{
+    WHERE asset_type = 'OPTION' AND ticker = ? AND option_type = ? AND strike_price = ? AND expiration_date = ?`
+  const params: unknown[] = [ticker, optionType, strikePrice, expirationDate]
+
+  if (portfolioId !== undefined) {
+    query += ' AND portfolio_id = ?'
+    params.push(portfolioId)
+  }
+
+  query += ' ORDER BY date ASC, created_at ASC'
+
+  const transactions = db.prepare(query).all(...params) as ReadonlyArray<{
     option_action: string
     shares: number
   }>

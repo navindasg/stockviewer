@@ -1,6 +1,7 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { useAppStore, type ViewName } from '../../stores/appStore'
 import { useDividendStore } from '../../stores/dividendStore'
+import { usePortfolioStore } from '../../stores/portfolioStore'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { AddTransactionModal } from '../Forms/AddTransactionModal'
@@ -13,6 +14,7 @@ import { WatchlistView } from '../Watchlist/WatchlistView'
 import { DividendsView } from '../Views/DividendsView'
 import { OptionsView } from '../Views/OptionsView'
 import { BenchmarkView } from '../Views/BenchmarkView'
+import { PortfolioManagerView } from '../Portfolios/PortfolioManagerView'
 
 function renderView(activeView: ViewName) {
   switch (activeView) {
@@ -34,6 +36,8 @@ function renderView(activeView: ViewName) {
       return <DividendsView />
     case 'options':
       return <OptionsView />
+    case 'portfolios':
+      return <PortfolioManagerView />
     default:
       return <DashboardView />
   }
@@ -48,6 +52,8 @@ export function Shell() {
   const setModalOpen = useAppStore((state) => state.setModalOpen)
   const selectedTicker = useAppStore((state) => state.selectedTicker)
   const fetchDividendSummary = useDividendStore((state) => state.fetchDividendSummary)
+  const fetchPortfolios = usePortfolioStore((state) => state.fetchPortfolios)
+  const activePortfolioId = usePortfolioStore((state) => state.activePortfolioId)
 
   const handleCloseModal = useCallback(() => {
     setModalOpen(false)
@@ -89,6 +95,11 @@ export function Shell() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
+        await fetchPortfolios()
+      } catch {
+        // Portfolios are best-effort on first load
+      }
+      try {
         await fetchPositions()
       } catch {
         // Store actions throw with details; positions will remain empty
@@ -100,7 +111,28 @@ export function Shell() {
       }
     }
     loadInitialData()
-  }, [fetchPositions, fetchDividendSummary])
+  }, [fetchPositions, fetchDividendSummary, fetchPortfolios])
+
+  const isInitialMount = useRef(true)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+    const refetchForPortfolio = async () => {
+      try {
+        await fetchPositions()
+      } catch {
+        // positions will remain stale
+      }
+      try {
+        await fetchDividendSummary()
+      } catch {
+        // summary is best-effort
+      }
+    }
+    refetchForPortfolio()
+  }, [activePortfolioId, fetchPositions, fetchDividendSummary])
 
   useEffect(() => {
     const tickers = positions.map((p) => p.ticker)

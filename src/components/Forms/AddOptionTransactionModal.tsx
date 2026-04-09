@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useOptionsStore } from '../../stores/optionsStore'
+import { usePortfolioStore } from '../../stores/portfolioStore'
 import { TickerSearch } from './TickerSearch'
+import { PortfolioSelect } from '../Portfolios/PortfolioSelect'
 import { getMaxDateTimeLocal, getNowLocalDateTimeString, INPUT_CLASS, INPUT_CLASS_NO_MONO, TEXTAREA_CLASS } from './formUtils'
 import { buildOccSymbol } from '../../utils/occSymbol'
 import type { OptionAction, OptionType, SearchResult, Quote } from '../../types/index'
@@ -29,6 +31,7 @@ interface FormState {
   readonly companyName: string
   readonly currentPrice: number | null
   readonly tickerValidated: boolean
+  readonly portfolioId: number | undefined
 }
 
 interface FormErrors {
@@ -51,6 +54,7 @@ const OPTION_ACTIONS: ReadonlyArray<{ readonly value: OptionAction; readonly lab
 ]
 
 function createInitialState(props: AddOptionTransactionModalProps): FormState {
+  const activePortfolioId = usePortfolioStore.getState().activePortfolioId
   return {
     ticker: props.prefillTicker ?? '',
     optionAction: props.prefillAction ?? 'BUY_TO_OPEN',
@@ -64,7 +68,8 @@ function createInitialState(props: AddOptionTransactionModalProps): FormState {
     notes: '',
     companyName: '',
     currentPrice: null,
-    tickerValidated: !!props.prefillTicker
+    tickerValidated: !!props.prefillTicker,
+    portfolioId: activePortfolioId ?? undefined
   }
 }
 
@@ -211,7 +216,8 @@ export function AddOptionTransactionModal({
         price: parseFloat(form.price),
         date: new Date(form.date).toISOString(),
         fees: form.fees ? parseFloat(form.fees) : undefined,
-        notes: form.notes || undefined
+        notes: form.notes || undefined,
+        portfolioId: form.portfolioId
       })
       onClose()
     } catch (error) {
@@ -280,6 +286,11 @@ export function AddOptionTransactionModal({
               </div>
             )}
           </div>
+
+          <PortfolioSelect
+            value={form.portfolioId}
+            onChange={(id) => updateField('portfolioId', id)}
+          />
 
           {/* Option Type (Call/Put) */}
           <div>

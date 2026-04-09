@@ -41,6 +41,14 @@ import {
   computeBenchmarkTWR,
   computeBenchmarkStats
 } from './db/benchmarks'
+import {
+  listPortfolios,
+  getPortfolio,
+  createPortfolio,
+  updatePortfolio,
+  deletePortfolio
+} from './db/portfolios'
+import type { NewPortfolio, UpdatePortfolio } from '../src/types/index'
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -118,12 +126,22 @@ function registerIpcHandlers(): void {
     deleteTransaction(id)
   })
 
-  ipcMain.handle('db:getTransactions', (_event, filters?: TransactionFilters) => {
-    return getTransactions(filters)
+  ipcMain.handle('db:getTransactions', (_event, filters?: unknown) => {
+    if (filters !== undefined) {
+      if (typeof filters !== 'object' || filters === null) throw new Error('Invalid filters')
+      const f = filters as Record<string, unknown>
+      if (f.ticker !== undefined && (typeof f.ticker !== 'string' || f.ticker.length === 0)) throw new Error('Invalid ticker filter')
+      if (f.type !== undefined && f.type !== 'BUY' && f.type !== 'SELL') throw new Error('Invalid type filter')
+      if (f.fromDate !== undefined && typeof f.fromDate !== 'string') throw new Error('Invalid fromDate filter')
+      if (f.toDate !== undefined && typeof f.toDate !== 'string') throw new Error('Invalid toDate filter')
+      if (f.portfolioId !== undefined && typeof f.portfolioId !== 'number') throw new Error('Invalid portfolio ID filter')
+    }
+    return getTransactions(filters as TransactionFilters | undefined)
   })
 
-  ipcMain.handle('db:getPositions', () => {
-    return getPositions()
+  ipcMain.handle('db:getPositions', (_event, portfolioId?: unknown) => {
+    if (portfolioId !== undefined && typeof portfolioId !== 'number') throw new Error('Invalid portfolio ID')
+    return getPositions(portfolioId as number | undefined)
   })
 
   ipcMain.handle('db:getPortfolioSummary', () => {
@@ -332,8 +350,9 @@ function registerIpcHandlers(): void {
     deleteDividend(id)
   })
 
-  ipcMain.handle('db:getDividendSummary', () => {
-    return getDividendSummary()
+  ipcMain.handle('db:getDividendSummary', (_event, portfolioId?: unknown) => {
+    if (portfolioId !== undefined && typeof portfolioId !== 'number') throw new Error('Invalid portfolio ID')
+    return getDividendSummary(portfolioId as number | undefined)
   })
 
   ipcMain.handle('market:getDividendHistory', async (_event, ticker: string, from?: string) => {
@@ -359,9 +378,10 @@ function registerIpcHandlers(): void {
     if (typeof ticker !== 'string' || ticker.length === 0 || ticker.length > 10) throw new Error('Invalid ticker')
   }
 
-  ipcMain.handle('db:getPortfolioTWR', async (_event, from: unknown, to: unknown) => {
+  ipcMain.handle('db:getPortfolioTWR', async (_event, from: unknown, to: unknown, portfolioId?: unknown) => {
     validateDateRange(from, to)
-    return computePortfolioTWR(from, to as string)
+    if (portfolioId !== undefined && typeof portfolioId !== 'number') throw new Error('Invalid portfolio ID')
+    return computePortfolioTWR(from, to as string, portfolioId as number | undefined)
   })
 
   ipcMain.handle('db:getBenchmarkTWR', async (_event, ticker: unknown, from: unknown, to: unknown) => {
@@ -370,18 +390,20 @@ function registerIpcHandlers(): void {
     return computeBenchmarkTWR(ticker, from, to as string)
   })
 
-  ipcMain.handle('db:getBenchmarkStats', async (_event, benchmarkTicker: unknown, from: unknown, to: unknown) => {
+  ipcMain.handle('db:getBenchmarkStats', async (_event, benchmarkTicker: unknown, from: unknown, to: unknown, portfolioId?: unknown) => {
     validateBenchmarkTicker(benchmarkTicker)
     validateDateRange(from, to)
-    const portfolioTWR = computePortfolioTWR(from, to as string)
+    if (portfolioId !== undefined && typeof portfolioId !== 'number') throw new Error('Invalid portfolio ID')
+    const portfolioTWR = computePortfolioTWR(from, to as string, portfolioId as number | undefined)
     const benchmarkTWR = computeBenchmarkTWR(benchmarkTicker, from, to as string)
     return computeBenchmarkStats(portfolioTWR, benchmarkTWR, from, to as string)
   })
 
-  ipcMain.handle('db:getBenchmarkData', async (_event, benchmarkTicker: unknown, from: unknown, to: unknown) => {
+  ipcMain.handle('db:getBenchmarkData', async (_event, benchmarkTicker: unknown, from: unknown, to: unknown, portfolioId?: unknown) => {
     validateBenchmarkTicker(benchmarkTicker)
     validateDateRange(from, to)
-    const portfolioTWR = computePortfolioTWR(from, to as string)
+    if (portfolioId !== undefined && typeof portfolioId !== 'number') throw new Error('Invalid portfolio ID')
+    const portfolioTWR = computePortfolioTWR(from, to as string, portfolioId as number | undefined)
     const benchmarkTWR = computeBenchmarkTWR(benchmarkTicker, from, to as string)
     const stats = computeBenchmarkStats(portfolioTWR, benchmarkTWR, from, to as string)
     return { portfolioTWR, benchmarkTWR, stats }
@@ -424,6 +446,58 @@ function registerIpcHandlers(): void {
     if (typeof ticker !== 'string' || ticker.length === 0) throw new Error('Invalid ticker')
     if (expirationDate !== undefined && typeof expirationDate !== 'string') throw new Error('Invalid expiration date')
     return getOptionsChain(ticker, expirationDate)
+  })
+
+  // Portfolio CRUD handlers
+  ipcMain.handle('db:listPortfolios', () => {
+    return listPortfolios()
+  })
+
+  ipcMain.handle('db:getPortfolio', (_event, id: unknown) => {
+    if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) throw new Error('Invalid portfolio ID')
+    return getPortfolio(id)
+  })
+
+  ipcMain.handle('db:createPortfolio', (_event, input: unknown) => {
+    if (!input || typeof input !== 'object') throw new Error('Invalid input')
+    const { name, description, defaultCostBasisMethod } = input as Record<string, unknown>
+    if (typeof name !== 'string' || name.trim().length === 0 || name.length > 100) {
+      throw new Error('Invalid portfolio name')
+    }
+    if (description !== undefined && description !== null && typeof description !== 'string') {
+      throw new Error('Invalid description')
+    }
+    if (defaultCostBasisMethod !== undefined) {
+      const validMethods = ['FIFO', 'LIFO', 'AVGCOST', 'SPECIFIC']
+      if (typeof defaultCostBasisMethod !== 'string' || !validMethods.includes(defaultCostBasisMethod)) {
+        throw new Error('Invalid cost basis method')
+      }
+    }
+    return createPortfolio(input as NewPortfolio)
+  })
+
+  ipcMain.handle('db:updatePortfolio', (_event, id: unknown, updates: unknown) => {
+    if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) throw new Error('Invalid portfolio ID')
+    if (!updates || typeof updates !== 'object') throw new Error('Invalid updates')
+    const u = updates as Record<string, unknown>
+    if (u.name !== undefined && (typeof u.name !== 'string' || u.name.trim().length === 0 || u.name.length > 100)) {
+      throw new Error('Invalid portfolio name')
+    }
+    if (u.description !== undefined && u.description !== null && typeof u.description !== 'string') {
+      throw new Error('Invalid description')
+    }
+    if (u.defaultCostBasisMethod !== undefined) {
+      const validMethods = ['FIFO', 'LIFO', 'AVGCOST', 'SPECIFIC']
+      if (typeof u.defaultCostBasisMethod !== 'string' || !validMethods.includes(u.defaultCostBasisMethod)) {
+        throw new Error('Invalid cost basis method')
+      }
+    }
+    return updatePortfolio(id, updates as UpdatePortfolio)
+  })
+
+  ipcMain.handle('db:deletePortfolio', (_event, id: unknown) => {
+    if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) throw new Error('Invalid portfolio ID')
+    deletePortfolio(id)
   })
 }
 

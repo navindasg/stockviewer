@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { useAppStore } from '../../stores/appStore'
+import { usePortfolioStore } from '../../stores/portfolioStore'
 import { useMarketData } from '../../hooks/useMarketData'
 import { useDividends, useDividendInfo } from '../../hooks/useDividends'
 import { PriceChart } from '../Charts/PriceChart'
@@ -179,11 +180,13 @@ function PositionDetailInner({
   const dividendInfo = useDividendInfo(ticker)
   const [dividendModalOpen, setDividendModalOpen] = useState(false)
 
+  const activePortfolioId = usePortfolioStore((s) => s.activePortfolioId)
+
   useEffect(() => {
     let cancelled = false
     setTxLoading(true)
     window.electronAPI
-      .getTransactions({ ticker })
+      .getTransactions({ ticker, ...(activePortfolioId !== null ? { portfolioId: activePortfolioId } : {}) })
       .then((txs) => {
         if (!cancelled) setTransactions(txs)
       })
@@ -196,7 +199,7 @@ function PositionDetailInner({
         if (!cancelled) setTxLoading(false)
       })
     return () => { cancelled = true }
-  }, [ticker, setTransactions, setTxLoading])
+  }, [ticker, activePortfolioId, setTransactions, setTxLoading])
 
   useEffect(() => {
     fetchTaxLots(ticker).catch(() => {})

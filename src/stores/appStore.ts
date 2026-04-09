@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import type { Position, Quote, NewTransaction, TaxLot, CostBasisMethod, TaxReportSummary } from '../types/index'
+import { usePortfolioStore } from './portfolioStore'
 
-export type ViewName = 'dashboard' | 'position-detail' | 'compare' | 'transactions' | 'closed-positions' | 'watchlist' | 'dividends' | 'options' | 'benchmark'
+export type ViewName = 'dashboard' | 'position-detail' | 'compare' | 'transactions' | 'closed-positions' | 'watchlist' | 'dividends' | 'options' | 'benchmark' | 'portfolios'
 export type GainStatus = 'all' | 'winners' | 'losers'
 
 export interface FilterState {
@@ -73,7 +74,8 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   fetchPositions: async () => {
     set({ positionsLoading: true })
     try {
-      const positions = await window.electronAPI.getPositions()
+      const portfolioId = usePortfolioStore.getState().activePortfolioId
+      const positions = await window.electronAPI.getPositions(portfolioId ?? undefined)
       set({ positions, positionsLoading: false })
     } catch (error) {
       set({ positionsLoading: false })

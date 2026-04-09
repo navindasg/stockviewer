@@ -122,6 +122,21 @@ function BenchmarkIcon() {
   )
 }
 
+function PortfoliosIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M2 5C2 4.17 2.67 3.5 3.5 3.5H7L9 5.5H16.5C17.33 5.5 18 6.17 18 7V14.5C18 15.33 17.33 16 16.5 16H3.5C2.67 16 2 15.33 2 14.5V5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M7 10H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
   { id: 'position-detail', label: 'Positions', icon: <PositionsIcon /> },
@@ -131,7 +146,8 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { id: 'transactions', label: 'Transactions', icon: <TransactionsIcon /> },
   { id: 'dividends', label: 'Dividends', icon: <DividendsIcon /> },
   { id: 'closed-positions', label: 'Closed Trades', icon: <ClosedTradesIcon /> },
-  { id: 'watchlist', label: 'Watchlist', icon: <WatchlistIcon /> }
+  { id: 'watchlist', label: 'Watchlist', icon: <WatchlistIcon /> },
+  { id: 'portfolios', label: 'Portfolios', icon: <PortfoliosIcon /> }
 ]
 
 export function Sidebar() {

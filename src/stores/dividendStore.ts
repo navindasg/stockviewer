@@ -6,6 +6,7 @@ import type {
   PortfolioDividendSummary,
   DividendInfo
 } from '../types/index'
+import { usePortfolioStore } from './portfolioStore'
 
 interface DividendState {
   readonly dividends: ReadonlyArray<Dividend>
@@ -36,7 +37,12 @@ export const useDividendStore = create<DividendStore>()((set, get) => ({
   fetchDividends: async (filters?: DividendFilters) => {
     set({ dividendsLoading: true })
     try {
-      const dividends = await window.electronAPI.getDividends(filters) as Dividend[]
+      const portfolioId = usePortfolioStore.getState().activePortfolioId
+      const mergedFilters: DividendFilters = {
+        ...filters,
+        ...(portfolioId !== null ? { portfolioId } : {})
+      }
+      const dividends = await window.electronAPI.getDividends(mergedFilters) as Dividend[]
       set({ dividends, dividendsLoading: false })
     } catch (error) {
       set({ dividendsLoading: false })
@@ -87,7 +93,8 @@ export const useDividendStore = create<DividendStore>()((set, get) => ({
   fetchDividendSummary: async () => {
     set({ summaryLoading: true })
     try {
-      const summary = await window.electronAPI.getDividendSummary() as PortfolioDividendSummary
+      const portfolioId = usePortfolioStore.getState().activePortfolioId
+      const summary = await window.electronAPI.getDividendSummary(portfolioId ?? undefined) as PortfolioDividendSummary
       set({ summary, summaryLoading: false })
     } catch (error) {
       set({ summaryLoading: false })

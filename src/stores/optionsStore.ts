@@ -7,6 +7,7 @@ import type {
   OptionsChainData,
   PortfolioGreeks
 } from '../types/index'
+import { usePortfolioStore } from './portfolioStore'
 
 interface OptionsState {
   readonly optionPositions: ReadonlyArray<OptionPosition>
@@ -49,7 +50,12 @@ export const useOptionsStore = create<OptionsStore>()((set, get) => ({
   fetchOptionPositions: async (filters?: OptionPositionFilters) => {
     set({ optionPositionsLoading: true })
     try {
-      const positions = await window.electronAPI.getOptionPositions(filters) as OptionPosition[]
+      const portfolioId = usePortfolioStore.getState().activePortfolioId
+      const mergedFilters: OptionPositionFilters = {
+        ...filters,
+        ...(portfolioId !== null ? { portfolioId } : {})
+      }
+      const positions = await window.electronAPI.getOptionPositions(mergedFilters) as OptionPosition[]
       set({ optionPositions: positions, optionPositionsLoading: false })
     } catch (error) {
       set({ optionPositionsLoading: false })
@@ -61,7 +67,12 @@ export const useOptionsStore = create<OptionsStore>()((set, get) => ({
 
   fetchOptionTransactions: async (filters?: OptionPositionFilters) => {
     try {
-      const transactions = await window.electronAPI.getOptionTransactions(filters) as OptionTransaction[]
+      const portfolioId = usePortfolioStore.getState().activePortfolioId
+      const mergedFilters: OptionPositionFilters = {
+        ...filters,
+        ...(portfolioId !== null ? { portfolioId } : {})
+      }
+      const transactions = await window.electronAPI.getOptionTransactions(mergedFilters) as OptionTransaction[]
       set({ optionTransactions: transactions })
     } catch (error) {
       throw new Error(

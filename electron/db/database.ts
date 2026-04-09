@@ -122,11 +122,74 @@ function runMigrations(database: Database.Database): void {
   addColumnIfNotExists(database, 'transactions', 'expiration_date', 'TEXT')
   addColumnIfNotExists(database, 'transactions', 'contract_multiplier', 'INTEGER')
   addColumnIfNotExists(database, 'transactions', 'option_action', 'TEXT')
+
+  // Multi-portfolio support
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS portfolios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      default_cost_basis_method TEXT NOT NULL DEFAULT 'AVGCOST',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `)
+
+  migratePortfolios(database)
 }
 
-const ALLOWED_TABLES = new Set(['ticker_metadata', 'transactions', 'tax_lots', 'lot_assignments', 'price_cache', 'watchlist', 'dividends'])
+const ALLOWED_TABLES = new Set(['ticker_metadata', 'transactions', 'tax_lots', 'lot_assignments', 'price_cache', 'watchlist', 'dividends', 'portfolios'])
 const IDENTIFIER_PATTERN = /^[a-z_]+$/
 const DEFINITION_PATTERN = /^[A-Z ]+(?:\([^)]+\))?(?:\s+(?:NOT NULL|DEFAULT '[^']*'|DEFAULT \d+))*$/
+
+function migratePortfolios(database: Database.Database): void {
+  // Ensure a default portfolio exists
+  const defaultPortfolio = database.prepare(
+    'SELECT id FROM portfolios WHERE is_default = 1'
+  ).get() as { id: number } | undefined
+
+  if (!defaultPortfolio) {
+    database.prepare(
+      "INSERT INTO portfolios (name, description, is_default, default_cost_basis_method) VALUES ('Default', 'Default portfolio', 1, 'AVGCOST')"
+    ).run()
+  }
+
+  // Add portfolio_id column to transactions if not present
+  addColumnIfNotExists(database, 'transactions', 'portfolio_id', 'INTEGER')
+
+  // Add portfolio_id column to dividends if not present
+  addColumnIfNotExists(database, 'dividends', 'portfolio_id', 'INTEGER')
+
+  // Backfill existing transactions and dividends with the default portfolio
+  const dp = database.prepare(
+    'SELECT id FROM portfolios WHERE is_default = 1'
+  ).get() as { id: number }
+
+  const unassignedTx = database.prepare(
+    'SELECT COUNT(*) as count FROM transactions WHERE portfolio_id IS NULL'
+  ).get() as { count: number }
+
+  if (unassignedTx.count > 0) {
+    database.prepare(
+      'UPDATE transactions SET portfolio_id = ? WHERE portfolio_id IS NULL'
+    ).run(dp.id)
+  }
+
+  const unassignedDiv = database.prepare(
+    'SELECT COUNT(*) as count FROM dividends WHERE portfolio_id IS NULL'
+  ).get() as { count: number }
+
+  if (unassignedDiv.count > 0) {
+    database.prepare(
+      'UPDATE dividends SET portfolio_id = ? WHERE portfolio_id IS NULL'
+    ).run(dp.id)
+  }
+
+  // Create index for portfolio_id on transactions
+  database.exec('CREATE INDEX IF NOT EXISTS idx_transactions_portfolio ON transactions(portfolio_id)')
+  database.exec('CREATE INDEX IF NOT EXISTS idx_dividends_portfolio ON dividends(portfolio_id)')
+}
 
 function addColumnIfNotExists(database: Database.Database, table: string, column: string, definition: string): void {
   if (!ALLOWED_TABLES.has(table)) {

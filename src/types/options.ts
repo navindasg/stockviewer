@@ -43,6 +43,7 @@ export interface NewOptionTransaction {
   readonly date: string
   readonly fees?: number
   readonly notes?: string
+  readonly portfolioId?: number
 }
 
 export interface OptionPosition {
@@ -70,6 +71,7 @@ export interface OptionPositionFilters {
   readonly ticker?: string
   readonly status?: OptionPositionStatus
   readonly optionType?: OptionType
+  readonly portfolioId?: number
 }
 
 export interface OptionsChainContract {

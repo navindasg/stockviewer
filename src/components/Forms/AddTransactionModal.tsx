@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '../../stores/appStore'
+import { usePortfolioStore } from '../../stores/portfolioStore'
 import { TickerSearch } from './TickerSearch'
 import { LotPicker } from '../TaxLots/LotPicker'
+import { PortfolioSelect } from '../Portfolios/PortfolioSelect'
 import { getMaxDateTimeLocal, getNowLocalDateTimeString, INPUT_CLASS, INPUT_CLASS_NO_MONO, TEXTAREA_CLASS } from './formUtils'
 import type { TransactionType, SearchResult, Quote, CostBasisMethod } from '../../types/index'
 
@@ -22,6 +24,7 @@ interface FormState {
   readonly companyName: string
   readonly currentPrice: number | null
   readonly tickerValidated: boolean
+  readonly portfolioId: number | undefined
 }
 
 interface FormErrors {
@@ -32,6 +35,7 @@ interface FormErrors {
 }
 
 function createInitialState(prefillTicker?: string): FormState {
+  const activePortfolioId = usePortfolioStore.getState().activePortfolioId
   return {
     ticker: prefillTicker ?? '',
     type: 'BUY',
@@ -42,7 +46,8 @@ function createInitialState(prefillTicker?: string): FormState {
     notes: '',
     companyName: '',
     currentPrice: null,
-    tickerValidated: false
+    tickerValidated: false,
+    portfolioId: activePortfolioId ?? undefined
   }
 }
 
@@ -185,7 +190,8 @@ export function AddTransactionModal({ isOpen, onClose, prefillTicker }: AddTrans
           price: parseFloat(form.price),
           date: new Date(form.date).toISOString(),
           fees: form.fees ? parseFloat(form.fees) : undefined,
-          notes: form.notes || undefined
+          notes: form.notes || undefined,
+          portfolioId: form.portfolioId
         },
         isSpecificSell ? lotSelections : undefined
       )
@@ -258,6 +264,11 @@ export function AddTransactionModal({ isOpen, onClose, prefillTicker }: AddTrans
               </div>
             )}
           </div>
+
+          <PortfolioSelect
+            value={form.portfolioId}
+            onChange={(id) => updateField('portfolioId', id)}
+          />
 
           <div>
             <label className="block text-sm font-medium text-sv-text-secondary mb-1">Type</label>

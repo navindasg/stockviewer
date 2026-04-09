@@ -9,7 +9,7 @@ export interface ElectronAPI {
   getQuotes: (tickers: string[]) => Promise<unknown[]>
   getHistoricalPrices: (ticker: string, from: string, to: string) => Promise<unknown[]>
   searchTicker: (query: string) => Promise<unknown[]>
-  getPositions: () => Promise<unknown[]>
+  getPositions: (portfolioId?: number) => Promise<unknown[]>
   getPortfolioSummary: () => Promise<unknown>
   getWatchlist: () => Promise<unknown[]>
   addWatchlistItem: (item: Record<string, unknown>) => Promise<unknown>
@@ -28,7 +28,7 @@ export interface ElectronAPI {
   addDividend: (input: Record<string, unknown>) => Promise<unknown>
   updateDividend: (id: string, updates: Record<string, unknown>) => Promise<unknown>
   deleteDividend: (id: string) => Promise<void>
-  getDividendSummary: () => Promise<unknown>
+  getDividendSummary: (portfolioId?: number) => Promise<unknown>
   getDividendHistory: (ticker: string, from?: string) => Promise<unknown[]>
   getDividendInfo: (ticker: string) => Promise<unknown>
   addOptionTransaction: (tx: Record<string, unknown>) => Promise<unknown>
@@ -36,6 +36,12 @@ export interface ElectronAPI {
   getOptionTransactions: (filters?: Record<string, unknown>) => Promise<unknown[]>
   getOptionPositions: (filters?: Record<string, unknown>) => Promise<unknown[]>
   getOptionsChain: (ticker: string, expirationDate?: string) => Promise<unknown>
+  // Portfolios
+  listPortfolios: () => Promise<unknown[]>
+  getPortfolio: (id: number) => Promise<unknown>
+  createPortfolio: (input: Record<string, unknown>) => Promise<unknown>
+  updatePortfolio: (id: number, updates: Record<string, unknown>) => Promise<unknown>
+  deletePortfolio: (id: number) => Promise<void>
 }
 
 const api: ElectronAPI = {
@@ -48,7 +54,7 @@ const api: ElectronAPI = {
   getHistoricalPrices: (ticker, from, to) =>
     ipcRenderer.invoke('market:getHistoricalPrices', ticker, from, to),
   searchTicker: (query) => ipcRenderer.invoke('market:searchTicker', query),
-  getPositions: () => ipcRenderer.invoke('db:getPositions'),
+  getPositions: (portfolioId) => ipcRenderer.invoke('db:getPositions', portfolioId),
   getPortfolioSummary: () => ipcRenderer.invoke('db:getPortfolioSummary'),
   getWatchlist: () => ipcRenderer.invoke('db:getWatchlist'),
   addWatchlistItem: (item) => ipcRenderer.invoke('db:addWatchlistItem', item),
@@ -67,18 +73,24 @@ const api: ElectronAPI = {
   addDividend: (input) => ipcRenderer.invoke('db:addDividend', input),
   updateDividend: (id, updates) => ipcRenderer.invoke('db:updateDividend', id, updates),
   deleteDividend: (id) => ipcRenderer.invoke('db:deleteDividend', id),
-  getDividendSummary: () => ipcRenderer.invoke('db:getDividendSummary'),
+  getDividendSummary: (portfolioId) => ipcRenderer.invoke('db:getDividendSummary', portfolioId),
   getDividendHistory: (ticker, from) => ipcRenderer.invoke('market:getDividendHistory', ticker, from),
   getDividendInfo: (ticker) => ipcRenderer.invoke('market:getDividendInfo', ticker),
-  getPortfolioTWR: (from, to) => ipcRenderer.invoke('db:getPortfolioTWR', from, to),
+  getPortfolioTWR: (from, to, portfolioId) => ipcRenderer.invoke('db:getPortfolioTWR', from, to, portfolioId),
   getBenchmarkTWR: (ticker, from, to) => ipcRenderer.invoke('db:getBenchmarkTWR', ticker, from, to),
   getBenchmarkStats: (benchmarkTicker, from, to) => ipcRenderer.invoke('db:getBenchmarkStats', benchmarkTicker, from, to),
-  getBenchmarkData: (benchmarkTicker, from, to) => ipcRenderer.invoke('db:getBenchmarkData', benchmarkTicker, from, to),
+  getBenchmarkData: (benchmarkTicker, from, to, portfolioId) => ipcRenderer.invoke('db:getBenchmarkData', benchmarkTicker, from, to, portfolioId),
   addOptionTransaction: (tx) => ipcRenderer.invoke('db:addOptionTransaction', tx),
   deleteOptionTransaction: (id) => ipcRenderer.invoke('db:deleteOptionTransaction', id),
   getOptionTransactions: (filters) => ipcRenderer.invoke('db:getOptionTransactions', filters),
   getOptionPositions: (filters) => ipcRenderer.invoke('db:getOptionPositions', filters),
-  getOptionsChain: (ticker, expirationDate) => ipcRenderer.invoke('market:getOptionsChain', ticker, expirationDate)
+  getOptionsChain: (ticker, expirationDate) => ipcRenderer.invoke('market:getOptionsChain', ticker, expirationDate),
+  // Portfolios
+  listPortfolios: () => ipcRenderer.invoke('db:listPortfolios'),
+  getPortfolio: (id) => ipcRenderer.invoke('db:getPortfolio', id),
+  createPortfolio: (input) => ipcRenderer.invoke('db:createPortfolio', input),
+  updatePortfolio: (id, updates) => ipcRenderer.invoke('db:updatePortfolio', id, updates),
+  deletePortfolio: (id) => ipcRenderer.invoke('db:deletePortfolio', id)
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api)
